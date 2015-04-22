@@ -1,0 +1,6 @@
+<form method=post>
+    <h1>JackRose sign on
+    <div>username <input type=text name=username value="#{Pervasive.unpack username}">
+    <div>password <input type=password name=password>
+    <div><input type=submit name=login value=login> <input type=submit name=login value=new>
+    <div><a href="@{AuthR YAA.resetPasswordR}">New</a>

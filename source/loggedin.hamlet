@@ -1,0 +1,2 @@
+<p>You are logged in as #{username} #
+<p><a href="@{AuthR YA.LogoutR}">Logout</a>
