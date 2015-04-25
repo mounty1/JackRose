@@ -15,6 +15,8 @@ executable JackRose
                       bytestring,
                       monad-logger,
                       smtp-mail,
+                      ConfigFile,
+                      mtl,
                       transformers,
                       resourcet,
                       mime-mail,

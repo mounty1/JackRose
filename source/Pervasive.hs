@@ -3,11 +3,12 @@ module Pervasive (TextItem,
 	toByteS,
 	fromByteS,
 	nullText,
+	Data.Text.singleton,
 	Data.Text.pack,
 	Data.Text.unpack,
 	Data.Text.concat) where
 
-import qualified Data.Text (Text, length, empty, unpack, pack, concat)
+import qualified Data.Text (Text, length, empty, unpack, pack, concat, singleton)
 import qualified Data.Text.Encoding as TE (encodeUtf8, decodeUtf8)
 import qualified Data.ByteString (ByteString)
 
