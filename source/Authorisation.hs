@@ -1,13 +1,12 @@
 {-# LANGUAGE QuasiQuotes, TypeFamilies, GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts, TemplateHaskell #-}
-{-# LANGUAGE GADTs, MultiParamTypeClasses, TypeSynonymInstances #-}
+{-# LANGUAGE GADTs, MultiParamTypeClasses #-}
 
 module Authorisation (upgradeDB, User, persistAction, PerstQ.SqlBackend) where
 
 import qualified Database.Persist.Sqlite as PerstQ
 import qualified Yesod as Y
 import qualified Yesod.Auth.Account as YAA
-import qualified Foundation (authTable, JRState)
 import qualified Data.ByteString as DB
 import qualified Pervasive (TextItem, nullText)
 import qualified Control.Monad.Trans.Resource as CMTS (ResourceT)
@@ -41,13 +40,13 @@ instance YAA.PersistUserCredentials User where
 	userCreate name email key pwd = User name pwd email False key Pervasive.nullText
 
 	
-persistAction :: (Y.MonadBaseControl IO m, Y.MonadIO m, Y.MonadLogger m) => PerstQ.SqlPersistT m a -> Foundation.JRState -> m a
-persistAction action site = PerstQ.withSqliteConn (Foundation.authTable site) enaction where
+persistAction :: (Y.MonadBaseControl IO m, Y.MonadIO m, Y.MonadLogger m) => PerstQ.SqlPersistT m a -> Pervasive.TextItem -> m a
+persistAction action table = PerstQ.withSqliteConn table enaction where
 	enaction = PerstQ.runSqlConn action
 
 
-upgradeDB :: Foundation.JRState -> IO ()
-upgradeDB site = PerstQ.runSqlite (Foundation.authTable site) runrunrun
+upgradeDB :: Pervasive.TextItem -> IO ()
+upgradeDB table = PerstQ.runSqlite table runrunrun
 
 
 runrunrun :: CMTR.ReaderT PerstQ.SqlBackend (CML.NoLoggingT (CMTS.ResourceT IO)) ()

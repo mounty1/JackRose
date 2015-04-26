@@ -1,2 +1,2 @@
 <p>You are logged in as #{username} #
-<p><a href="@{Routing.AuthR YA.LogoutR}">Logout</a>
+# <p><a href="ATSIGN{Foundation.AuthR YA.LogoutR}">Logout</a>

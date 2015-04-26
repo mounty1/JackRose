@@ -1,14 +1,32 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell, OverloadedStrings, TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 
-module Foundation (JRState(..), siteObject) where
+{-|
+Module      : Routing
+Description : Entry point for JackRose
+Copyright   : (c) Michael Mounteney, 2015
+License     : BSD 3 clause
+Maintainer  : jackrose@landcroft.com
+Stability   : experimental
+Portability : undefined
+
+This module is special inasmuch as it seems to be necessary, in order to fit
+with the TH magic, to avoid module namespaces.  Therefore all symbols are
+exported (even selecting exporting doesn't work) and the module is imported
+with 'qualified'.
+-}
+
+module Foundation where
 
 
-import qualified Pervasive (TextItem, pack)
-import qualified CommandArgs (CmdLineArgs(..))
-import qualified Data.ConfigFile as DC
-import qualified Control.Monad.Except as CME
-import qualified Data.List as DL (lookup)
-import qualified Data.Maybe as DM
+import qualified Yesod as Y
+import qualified Yesod.Core as YC
+import qualified Yesod.Auth as YA
+import qualified Yesod.Auth.Account as YAA
+import qualified Authorisation (User, SqlBackend, persistAction)
+import qualified RouteData
+import qualified EmailVerification
+import qualified Pervasive (TextItem)
 
 
 -- | The foundation object
@@ -21,61 +39,50 @@ data JRState = JRState {
 	}
 
 
-siteObject :: CommandArgs.CmdLineArgs -> IO JRState
-siteObject argsMap = configToSite configFileName baseSiteObject{debugging = CommandArgs.debuggery argsMap} where
-	configFileName = DM.fromMaybe defaultConfigFileName (CommandArgs.configName argsMap)
+YC.mkYesodData "JRState" RouteData.routeData
 
 
-configToSite :: String -> JRState -> IO JRState
-configToSite configName site = (CME.runExceptT $ pipe configName site) >>= estate
+type JRHandlerT wot = YC.HandlerT JRState IO wot
 
 
-estate :: Show t => Either t JRState -> IO JRState
-estate (Right state) = return state
-estate (Left err) = (putStrLn $ "<<" ++ show err ++ ">>") >> return baseSiteObject
+goHome, loginPlease :: JRHandlerT Y.Html
+goHome = YC.redirect HomeR
+loginPlease = YC.redirect (AuthR YA.LoginR)
 
 
-pipe :: (CME.MonadError DC.CPError m, CME.MonadIO m) => FilePath -> JRState -> m JRState
-pipe configName site =
-	(CME.join $ CME.liftIO $ DC.readfile DC.emptyCP{DC.optionxform=id} configName) >>= foldInCfg site
+instance YA.YesodAuth JRState where
+	type AuthId JRState = YAA.Username
+	getAuthId = return . Just . YA.credsIdent
+	loginDest _ = HomeR
+	logoutDest _ = AuthR YA.LoginR
+	authPlugins _ = [YAA.accountPlugin]
+	authHttpManager _ = error "No manager needed"
+	onLogin = return ()
+	maybeAuthId = YC.lookupSession YA.credsKey
 
 
-foldInCfg :: Monad m => JRState -> DC.ConfigParser -> m JRState
-foldInCfg site configuration =
-	return $ foldl mergeIn site seckeys where
-		mergeIn ss0 key = splice ss0 (DL.lookup key siteAlterMap) where
-			splice _ Nothing = error $ "invalid key " ++ key ++ " in configuration file"
-			splice ss (Just fn) = splice' ss fn
-			splice' ss (AB fn) = fn ss arg where (Right arg) = DC.get configuration defaultSection key
-			splice' ss (AI fn) = fn ss arg where (Right arg) = DC.get configuration defaultSection key
-			splice' ss (AS fn) = fn ss arg where (Right arg) = DC.get configuration defaultSection key
-		(Right seckeys) = DC.options configuration defaultSection
+instance YC.Yesod JRState where
+	makeSessionBackend site =
+		(if secureOnly site then YC.sslOnlySessions else id) $ fmap Just $ YC.defaultClientSessionBackend (sessionTimeout site) (keysFile site)
+	yesodMiddleware handler = YC.getYesod >>= ourMiddleWare where
+		ourMiddleWare site =
+			(if secureOnly site then YC.sslOnlyMiddleware (sessionTimeout site) else YC.defaultYesodMiddleware) handler
 
 
-type SiteAlterFn a = JRState -> a -> JRState
+instance Y.YesodPersist JRState where
+	type YesodPersistBackend JRState = Authorisation.SqlBackend
+	runDB action = YC.getYesod >>= (\site -> Authorisation.persistAction action (authTable site))
 
 
-data SiteAlterVector = AB (SiteAlterFn Bool)
-	| AI (SiteAlterFn Int)
-	| AS (SiteAlterFn String)
+instance YC.RenderMessage JRState Y.FormMessage where
+	renderMessage _ _ = Y.defaultFormMessage
 
 
-siteAlterMap :: [(DC.OptionSpec, SiteAlterVector)]
-siteAlterMap = [
-	("secureSession", AB (\site t -> site{secureOnly = t})),
-	("sessionMinutes", AI (\site t -> site{sessionTimeout = t})),
-	("userDatabase", AS (\site t -> site{authTable = Pervasive.pack t})),
-	("keysFile", AS (\site t -> site{keysFile = t}))
-	]
+-- this needs YC.Yesod JRState instance
+instance YAA.YesodAuthAccount (YAA.AccountPersistDB JRState Authorisation.User) JRState where
+	runAccountDB = YAA.runAccountPersistDB
 
 
-defaultSection :: String
-defaultSection  = "DEFAULT"
-
-
-baseSiteObject :: JRState
-baseSiteObject = JRState False 120 "users.sqlite" "jackrose-keys.aes" False
-
-
-defaultConfigFileName :: String
-defaultConfigFileName = "/etc/jackrose.cfg"
+instance YAA.AccountSendEmail JRState where
+	sendVerifyEmail uname email url = error $ "FUCK THIS SHIT" -- {- YC.getYesod >>= -} EmailVerification.newAccountEmail uname email url
+	sendNewPasswordEmail uname email url = error $ "FUCK THIS SHIT" -- {- YC.getYesod >>= -} EmailVerification.resetAccountEmail uname email url
