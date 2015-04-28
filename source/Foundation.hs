@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 
 {-|
-Module      : Routing
+Module      : Foundation
 Description : Entry point for JackRose
 Copyright   : (c) Michael Mounteney, 2015
 License     : BSD 3 clause
@@ -13,7 +13,7 @@ Portability : undefined
 This module is special inasmuch as it seems to be necessary, in order to fit
 with the TH magic, to avoid module namespaces.  Therefore all symbols are
 exported (even selecting exporting doesn't work) and the module is imported
-with 'qualified'.
+without 'qualified'.
 -}
 
 module Foundation where
@@ -34,7 +34,8 @@ data JRState = JRState {
 		secureOnly :: Bool,  -- ^ restrict connections to HTTPS
 		sessionTimeout :: Int,  -- ^ in minutes
 		portNumber :: Maybe Int,    -- ^ useful to override for non-privileged testing
-		authTable :: Pervasive.TextItem, -- ^ name of SQLite3 file of authorised users
+		authTable :: Pervasive.TextItem,
+			-- ^ SQLite3 file of authorised users.  Light usage so don't keep an open connection or pool.
 		keysFile :: FilePath,  -- ^ AES keys
 		appRoot :: Pervasive.TextItem, -- ^ needed for identification emails
 		debugging :: Bool   -- ^ output more information
