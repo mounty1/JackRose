@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, FlexibleInstances, TypeFamilies, MultiParamTypeClasses #-}
-
 {-|
 Module      : Main
 Description : Entry point for JackRose
@@ -15,25 +13,12 @@ Jackrose is a @spaced repetition web service@.
 module Main where
 
 
-import qualified Yesod as Y
-import qualified Yesod.Auth as YA
+import qualified Yesod as Y (warp)
 import qualified Authorisation (upgradeDB)
-import qualified Configure (siteObject)
+import qualified Configure (siteObject, portTCP)
 import qualified CommandArgs (args)
-import qualified Review (review, score)
-import qualified Data.Maybe as DM
-import Foundation
-
-
-Y.mkYesodDispatch "JRState" resourcesJRState
-
-
-getHomeR :: JRHandlerT Y.Html
-getHomeR = YA.maybeAuthId >>= DM.maybe loginPlease Review.review
-
-
-postHomeR :: JRHandlerT Y.Html
-postHomeR = YA.maybeAuthId >>= DM.maybe loginPlease Review.score
+import qualified Foundation (JRState(..))
+import qualified Application () -- just to get the instance and the dispatcher
 
 
 -- | Start here
@@ -45,5 +30,5 @@ main :: IO ()
 main = CommandArgs.args >>= Configure.siteObject >>= letsGo
 
 
-letsGo :: JRState -> IO ()
-letsGo site = Authorisation.upgradeDB (authTable site) >> Y.warp 3000 site
+letsGo :: Foundation.JRState -> IO ()
+letsGo site = Authorisation.upgradeDB (Foundation.authTable site) >> Y.warp (Configure.portTCP site) site

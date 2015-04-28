@@ -4,3 +4,8 @@ Spaced Repetition Software as a web service
 Implemented using the Yesod framework.
 
 Not much to see yet.
+
+As this is a learning exercise for the author:
+ * It is likely that best practice is not followed in many areas.
+ * Patches and comments are welcome, provided they are explained.
+ * The Yesod scaffolding system is not of interest.

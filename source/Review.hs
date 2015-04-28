@@ -4,9 +4,10 @@ module Review(review, score) where
 
 
 import qualified Yesod as Y
+import qualified Yesod.Auth as YA  -- for whamletfile
 import qualified Yesod.Core as YC
 import qualified Control.Applicative as CA ((<$>), (<*>))
-import Foundation (JRState(..), goHome)
+import qualified Foundation
 import qualified Pervasive (TextItem)
 
 
@@ -21,10 +22,14 @@ triple one two three = (one, two, three)
 
 
 enaction :: (Pervasive.TextItem, Pervasive.TextItem, Maybe Pervasive.TextItem) -> YC.HandlerT Foundation.JRState IO YC.Html
-enaction ("new", username, _) = Foundation.goHome
-enaction ("login", username, Just password) = Foundation.goHome
-enaction (_, username, _) = Foundation.goHome
+enaction ("new", username, _) = goHome
+enaction ("login", username, Just password) = goHome
+enaction (_, username, _) = goHome
 
 
-review :: Pervasive.TextItem -> YC.HandlerT Foundation.JRState IO YC.Html
+goHome :: Foundation.JRHandlerT Y.Html
+goHome = YC.redirect Foundation.HomeR
+
+
+review :: Pervasive.TextItem -> Foundation.JRHandlerT YC.Html
 review username = YC.defaultLayout $(YC.whamletFile "loggedin.hamlet")

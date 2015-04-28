@@ -26,15 +26,17 @@ import qualified Yesod.Auth.Account as YAA
 import qualified Authorisation (User, SqlBackend, persistAction)
 import qualified RouteData
 import qualified EmailVerification
-import qualified Pervasive (TextItem)
+import qualified Pervasive (TextItem, concat)
 
 
 -- | The foundation object
 data JRState = JRState {
 		secureOnly :: Bool,  -- ^ restrict connections to HTTPS
-		sessionTimeout :: Int,  -- ^ session time-out in minutes
+		sessionTimeout :: Int,  -- ^ in minutes
+		portNumber :: Maybe Int,    -- ^ useful to override for non-privileged testing
 		authTable :: Pervasive.TextItem, -- ^ name of SQLite3 file of authorised users
 		keysFile :: FilePath,  -- ^ AES keys
+		appRoot :: Pervasive.TextItem, -- ^ needed for identification emails
 		debugging :: Bool   -- ^ output more information
 	}
 
@@ -43,11 +45,6 @@ YC.mkYesodData "JRState" RouteData.routeData
 
 
 type JRHandlerT wot = YC.HandlerT JRState IO wot
-
-
-goHome, loginPlease :: JRHandlerT Y.Html
-goHome = YC.redirect HomeR
-loginPlease = YC.redirect (AuthR YA.LoginR)
 
 
 instance YA.YesodAuth JRState where
@@ -78,11 +75,16 @@ instance YC.RenderMessage JRState Y.FormMessage where
 	renderMessage _ _ = Y.defaultFormMessage
 
 
--- this needs YC.Yesod JRState instance
 instance YAA.YesodAuthAccount (YAA.AccountPersistDB JRState Authorisation.User) JRState where
 	runAccountDB = YAA.runAccountPersistDB
 
 
+emailEnaction :: (YC.MonadHandler m, YC.HandlerSite m ~ JRState) => (t -> t1 -> Pervasive.TextItem -> m b) -> t -> t1 -> Pervasive.TextItem -> m b
+emailEnaction action uname email url = YC.getYesod >>= enact where
+	enact site = action uname email fullURL where
+		fullURL = Pervasive.concat [appRoot site, url]
+
+
 instance YAA.AccountSendEmail JRState where
-	sendVerifyEmail uname email url = error $ "FUCK THIS SHIT" -- {- YC.getYesod >>= -} EmailVerification.newAccountEmail uname email url
-	sendNewPasswordEmail uname email url = error $ "FUCK THIS SHIT" -- {- YC.getYesod >>= -} EmailVerification.resetAccountEmail uname email url
+	sendVerifyEmail uname email url = emailEnaction EmailVerification.newAccountEmail uname email url
+	sendNewPasswordEmail uname email url = emailEnaction EmailVerification.resetAccountEmail uname email url

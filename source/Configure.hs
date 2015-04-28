@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
-module Configure (siteObject) where
+module Configure (siteObject, portTCP) where
 
 
-import qualified Pervasive (pack)
+import qualified Pervasive (pack, nullText)
 import qualified CommandArgs (CmdLineArgs(..))
 import qualified Data.ConfigFile as DC
 import qualified Control.Monad.Except as CME
@@ -19,6 +19,10 @@ siteObject argsMap = configToSite configFileName baseSiteObject{Foundation.debug
 
 configToSite :: String -> Foundation.JRState -> IO Foundation.JRState
 configToSite configName site = (CME.runExceptT $ pipe configName site) >>= estate
+
+
+portTCP :: Foundation.JRState -> Int
+portTCP site = DM.fromMaybe (if Foundation.secureOnly site then 443 else 80) (Foundation.portNumber site)
 
 
 estate :: Show t => Either t Foundation.JRState -> IO Foundation.JRState
@@ -55,7 +59,9 @@ siteAlterMap :: [(DC.OptionSpec, SiteAlterVector)]
 siteAlterMap = [
 	("secureSession", AB (\site t -> site{Foundation.secureOnly = t})),
 	("sessionMinutes", AI (\site t -> site{Foundation.sessionTimeout = t})),
+	("portNumber", AI (\site t -> site{Foundation.portNumber = Just t})),
 	("userDatabase", AS (\site t -> site{Foundation.authTable = Pervasive.pack t})),
+	("appRoot", AS (\site t -> site{Foundation.appRoot = Pervasive.pack t})),
 	("keysFile", AS (\site t -> site{Foundation.keysFile = t}))
 	]
 
@@ -65,7 +71,7 @@ defaultSection  = "DEFAULT"
 
 
 baseSiteObject :: Foundation.JRState
-baseSiteObject = Foundation.JRState False 120 "users.sqlite" "jackrose-keys.aes" False
+baseSiteObject = Foundation.JRState True 120 Nothing "users.sqlite" "jackrose-keys.aes" Pervasive.nullText False
 
 
 defaultConfigFileName :: String
