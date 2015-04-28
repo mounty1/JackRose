@@ -23,9 +23,9 @@ import qualified Application () -- just to get the instance and the dispatcher
 
 -- | Start here.
 main :: IO ()
--- ^ Turn the command line arguments into a map of option letters to arguments,
--- then use that to inform the construction of the foundation siteObject,
--- then check that the authorisation table is in the current format,
+-- ^ Turn the command line arguments into an easily-queried object,
+-- use that to inform the construction of the foundation siteObject,
+-- check that the authorisation table is in the current format,
 -- and finally hand over to Warp, to launch the service.
 main = CommandArgs.args >>= Configure.siteObject >>= letsGo
 
