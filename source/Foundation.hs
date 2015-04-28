@@ -2,13 +2,12 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 
 {-|
-Module      : Foundation
-Description : Entry point for JackRose
-Copyright   : (c) Michael Mounteney, 2015
-License     : BSD 3 clause
-Maintainer  : jackrose@landcroft.com
-Stability   : experimental
-Portability : undefined
+Description: Yesod 'master' data
+Copyright: (c) Michael Mounteney, 2015
+License: BSD 3 clause
+Maintainer: the project name, all lower case, at landcroft dot com
+Stability: experimental
+Portability: undefined
 
 This module is special inasmuch as it seems to be necessary, in order to fit
 with the TH magic, to avoid module namespaces.  Therefore all symbols are
@@ -26,7 +25,7 @@ import qualified Yesod.Auth.Account as YAA
 import qualified Authorisation (User, SqlBackend, persistAction)
 import qualified RouteData
 import qualified EmailVerification
-import qualified Pervasive (TextItem, concat)
+import qualified TextItem (TextItem, concat)
 
 
 -- | The foundation object
@@ -34,10 +33,10 @@ data JRState = JRState {
 		secureOnly :: Bool,  -- ^ restrict connections to HTTPS
 		sessionTimeout :: Int,  -- ^ in minutes
 		portNumber :: Maybe Int,    -- ^ useful to override for non-privileged testing
-		authTable :: Pervasive.TextItem,
+		authTable :: TextItem.TextItem,
 			-- ^ SQLite3 file of authorised users.  Light usage so don't keep an open connection or pool.
 		keysFile :: FilePath,  -- ^ AES keys
-		appRoot :: Pervasive.TextItem, -- ^ needed for identification emails
+		appRoot :: TextItem.TextItem, -- ^ needed for identification emails
 		debugging :: Bool   -- ^ output more information
 	}
 
@@ -80,10 +79,10 @@ instance YAA.YesodAuthAccount (YAA.AccountPersistDB JRState Authorisation.User) 
 	runAccountDB = YAA.runAccountPersistDB
 
 
-emailEnaction :: (YC.MonadHandler m, YC.HandlerSite m ~ JRState) => (t -> t1 -> Pervasive.TextItem -> m b) -> t -> t1 -> Pervasive.TextItem -> m b
+emailEnaction :: (YC.MonadHandler m, YC.HandlerSite m ~ JRState) => (t -> t1 -> TextItem.TextItem -> m b) -> t -> t1 -> TextItem.TextItem -> m b
 emailEnaction action uname email url = YC.getYesod >>= enact where
 	enact site = action uname email fullURL where
-		fullURL = Pervasive.concat [appRoot site, url]
+		fullURL = TextItem.concat [appRoot site, url]
 
 
 instance YAA.AccountSendEmail JRState where

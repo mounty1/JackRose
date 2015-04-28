@@ -3,3 +3,4 @@ site/
 .directory
 JackRose.xcf
 source/.halcyon
+source/dist

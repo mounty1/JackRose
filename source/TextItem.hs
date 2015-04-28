@@ -1,4 +1,15 @@
-module Pervasive (TextItem,
+{-|
+Description: Very thin wrapper of Data.Text;  easily torn
+Copyright: (c) Michael Mounteney, 2015
+License: BSD 3 clause
+Maintainer: the project name, all lower case, at landcroft dot com
+Stability: experimental
+Portability: undefined
+
+As this wrapper is so thin, we might just do away with it and commit to Data.Text
+-}
+
+module TextItem (TextItem,
 	Data.Text.length,
 	toByteS,
 	fromByteS,
