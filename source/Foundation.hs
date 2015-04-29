@@ -11,8 +11,8 @@ Portability: undefined
 
 This module is special inasmuch as it seems to be necessary, in order to fit
 with the TH magic, to avoid module namespaces.  Therefore all symbols are
-exported (even selecting exporting doesn't work) and the module is imported
-without 'qualified'.
+exported (even selective exporting doesn't work) and the module is imported
+without @qualified@.
 -}
 
 module Foundation where

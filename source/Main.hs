@@ -1,13 +1,13 @@
 {-|
 Module: Main
-Description: Entry point for JackRose
+Description: It all starts here.
 Copyright: (c) Michael Mounteney, 2015
 License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
 Stability: experimental
 Portability: undefined
 
-Jackrose is a @spaced repetition web service@.
+Jackrose is a spaced repetition web service.
 -}
 
 module Main (main) where
@@ -25,8 +25,8 @@ import qualified Application () -- just to get the instance and the dispatcher
 main :: IO ()
 -- ^ Turn the command line arguments into an easily-queried object,
 -- use that to inform the construction of the foundation siteObject,
--- check that the authorisation table is in the current format,
--- and finally hand over to Warp, to launch the service.
+-- check that the authorised users table is in the current format,
+-- and hand over to Warp, to launch the service.
 main = CommandArgs.args >>= Configure.siteObject >>= letsGo
 
 

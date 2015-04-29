@@ -1,5 +1,5 @@
 {-|
-Description: Top-level routing;  exports just the instances in @mkYesodDispatch
+Description: Top-level routing;  exports just the instances in @mkYesodDispatch@
 Copyright: (c) Michael Mounteney, 2015
 License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
