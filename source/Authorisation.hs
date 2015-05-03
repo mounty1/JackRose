@@ -17,7 +17,7 @@ import qualified Database.Persist.Sqlite as PerstQ
 import qualified Yesod as Y
 import qualified Yesod.Auth.Account as YAA
 import qualified Data.ByteString as DB
-import qualified TextItem (TextItem, nullText)
+import qualified Data.Text as DT (Text, empty)
 import qualified Control.Monad.Trans.Resource as CMTS (ResourceT)
 import qualified Control.Monad.Logger as CML (NoLoggingT)
 import qualified Control.Monad.Trans.Reader as CMTR (ReaderT)
@@ -25,12 +25,12 @@ import qualified Control.Monad.Trans.Reader as CMTR (ReaderT)
 
 Y.share [Y.mkPersist Y.sqlSettings, Y.mkSave "entityDefs"] [Y.persistLowerCase|
 User
-	username TextItem.TextItem
+	username DT.Text
 	password DB.ByteString
-	emailAddress TextItem.TextItem
+	emailAddress DT.Text
 	verified Bool
-	verifyKey TextItem.TextItem
-	resetPasswordKey TextItem.TextItem
+	verifyKey DT.Text
+	resetPasswordKey DT.Text
 	UniqueUsername username
 	deriving Show
 |]
@@ -38,7 +38,6 @@ User
 
 instance YAA.PersistUserCredentials User where
 	userUsernameF = UserUsername
-	-- userPasswordHashF (Y.EntityField val obj) = UserPassword (PerstS.EntityField val (TextItem.fromByteS obj))
 	userPasswordHashF = UserPassword
 	userEmailF = UserEmailAddress
 	userEmailVerifiedF = UserVerified
@@ -46,16 +45,16 @@ instance YAA.PersistUserCredentials User where
 	userResetPwdKeyF = UserResetPasswordKey
 	uniqueUsername = UniqueUsername
 
-	userCreate name email key pwd = User name pwd email False key TextItem.nullText
+	userCreate name email key pwd = User name pwd email False key DT.empty
 
 
 -- | pass in a database action and run it on the users table
-persistAction :: (Y.MonadBaseControl IO m, Y.MonadIO m, Y.MonadLogger m) => PerstQ.SqlPersistT m a -> TextItem.TextItem -> m a
+persistAction :: (Y.MonadBaseControl IO m, Y.MonadIO m, Y.MonadLogger m) => PerstQ.SqlPersistT m a -> DT.Text -> m a
 persistAction action table = PerstQ.withSqliteConn table enaction where
 	enaction = PerstQ.runSqlConn action
 
 
-upgradeDB :: TextItem.TextItem -> IO ()
+upgradeDB :: DT.Text -> IO ()
 upgradeDB table = PerstQ.runSqlite table runrunrun
 
 

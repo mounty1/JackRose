@@ -5,6 +5,10 @@ License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
 Stability: experimental
 Portability: undefined
+
+To keep the code as clean as possible, have just the bare minimum in this source,
+where it is subject to the various LANGUAGE extensions, and perform 'real'
+processing where all this black magic isn't in effect.
 -}
 
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, FlexibleInstances, TypeFamilies, MultiParamTypeClasses #-}
@@ -14,23 +18,10 @@ Portability: undefined
 module Application () where
 
 
-import qualified Yesod as Y
+import qualified Yesod
 import qualified Yesod.Auth as YA
-import qualified Review (review, score)
-import qualified Data.Maybe as DM
+import Review (getHomeR, postHomeR)
 import Foundation
 
 
-Y.mkYesodDispatch "JRState" resourcesJRState
-
-
-getHomeR :: JRHandlerT Y.Html
-getHomeR = YA.maybeAuthId >>= DM.maybe loginPlease Review.review
-
-
-postHomeR :: JRHandlerT Y.Html
-postHomeR = YA.maybeAuthId >>= DM.maybe loginPlease Review.score
-
-
-loginPlease :: JRHandlerT Y.Html
-loginPlease = Y.redirect (AuthR YA.LoginR)
+Yesod.mkYesodDispatch "JRState" resourcesJRState

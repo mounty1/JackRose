@@ -13,8 +13,8 @@ module Logging (logInfo) where
 
 
 import qualified Yesod.Core as YC
-import qualified TextItem (TextItem)
+import qualified Data.Text as DT (Text)
 
 
-logInfo :: YC.MonadLogger m => TextItem.TextItem -> m ()
+logInfo :: YC.MonadLogger m => DT.Text -> m ()
 logInfo message = $(YC.logInfo) message

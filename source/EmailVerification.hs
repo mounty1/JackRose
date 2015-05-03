@@ -11,33 +11,35 @@ module EmailVerification (newAccountEmail, resetAccountEmail) where
 
 
 import qualified Yesod.Core as YC
-import qualified TextItem (pack, TextItem, concat)
+import qualified Data.Text as DT (Text, pack, concat)
 import qualified Network.Mail.SMTP as SMTP
 import qualified Network.Mail.Mime as Mime
 import qualified Logging
 import qualified Data.Text.Lazy as DTL
 
 
-newAccountEmail, resetAccountEmail :: (YC.MonadIO m, YC.MonadLogger m) => TextItem.TextItem -> TextItem.TextItem -> TextItem.TextItem -> m ()
-newAccountEmail uname email url = do
+newAccountEmail, resetAccountEmail :: (YC.MonadIO m, YC.MonadLogger m) => DT.Text -> DT.Text -> DT.Text -> m ()
+
+newAccountEmail = emailAction "Verification"
+
+resetAccountEmail = emailAction "Reset password"
+
+
+emailAction :: (YC.MonadLogger m, YC.MonadIO m) => String -> DT.Text -> DT.Text -> DT.Text -> m ()
+emailAction text uname email url = do
 	YC.liftIO $ SMTP.sendMail "localhost" (makeEmail uname email url)
-	logAccountEmail uname email url "Verification"
+	logAccountEmail uname email url text
 
 
-resetAccountEmail uname email url = do
-	YC.liftIO $ SMTP.sendMail "localhost" (makeEmail uname email url)
-	logAccountEmail uname email url "Reset password"
-
-
-logAccountEmail :: YC.MonadLogger m => TextItem.TextItem -> TextItem.TextItem -> TextItem.TextItem -> String -> m ()
+logAccountEmail :: YC.MonadLogger m => DT.Text -> DT.Text -> DT.Text -> String -> m ()
 logAccountEmail uname email url action =
-	Logging.logInfo $ TextItem.concat [ TextItem.pack action, TextItem.pack " email for ", uname, TextItem.pack " (", email, TextItem.pack "): ", url ]
+	Logging.logInfo $ DT.concat [ DT.pack action, DT.pack " email for ", uname, DT.pack " (", email, DT.pack "): ", url ]
 
 
-makeEmail :: TextItem.TextItem -> TextItem.TextItem -> TextItem.TextItem -> Mime.Mail
+makeEmail :: DT.Text -> DT.Text -> DT.Text -> Mime.Mail
 makeEmail uname email url =
 	Mime.simpleMail'
 		( Mime.Address (Just uname) email )
-		( Mime.Address (Just $ TextItem.pack "JackRose Verification") (TextItem.pack "root@localhost") )
-		( TextItem.pack "JackRose Account" )
+		( Mime.Address (Just $ DT.pack "JackRose Verification") (DT.pack "root@localhost") )
+		( DT.pack "JackRose Account" )
 		( DTL.concat [ DTL.pack "Your URL is ", DTL.fromChunks [ url ] ] )

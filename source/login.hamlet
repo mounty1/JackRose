@@ -4,3 +4,15 @@
     <div>password <input type=password name=password>
     <div><input type=submit name=login value=login> <input type=submit name=login value=new>
     <div><a href="@{AuthR YAA.resetPasswordR}">New</a>
+<form method="post" enctype="application/x-www-form-urlencoded" action="/auth/page/account/login">
+    <h1>JackRose sign on
+    <div class="required">
+        <label for="username">Username
+        <input id="username" name="f1" type="text" required="" value="">
+    <div class="required">
+        <label for="password">Password
+        <input id="password" name="f2" type="password" required="" value="">
+<p>
+    <input type="submit" name="action" value="Login">
+    <a href="/auth/page/account/newaccount">Register a new account</a>
+    <a href="/auth/page/account/resetpassword">Forgot password?</a>

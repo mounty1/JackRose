@@ -12,7 +12,7 @@ Portability: undefined
 module Configure (siteObject, portTCP) where
 
 
-import qualified TextItem (pack, nullText)
+import qualified Data.Text as DT (pack, empty)
 import qualified CommandArgs (CmdLineArgs(..))
 import qualified Data.ConfigFile as DC
 import qualified Control.Monad.Except as CME
@@ -69,8 +69,8 @@ siteAlterMap = [
 	("secureSession", AB (\site t -> site{Foundation.secureOnly = t})),
 	("sessionMinutes", AI (\site t -> site{Foundation.sessionTimeout = t})),
 	("portNumber", AI (\site t -> site{Foundation.portNumber = Just t})),
-	("userDatabase", AS (\site t -> site{Foundation.authTable = TextItem.pack t})),
-	("appRoot", AS (\site t -> site{Foundation.appRoot = TextItem.pack t})),
+	("userDatabase", AS (\site t -> site{Foundation.authTable = DT.pack t})),
+	("appRoot", AS (\site t -> site{Foundation.appRoot = DT.pack t})),
 	("keysFile", AS (\site t -> site{Foundation.keysFile = t}))
 	]
 
@@ -80,7 +80,7 @@ defaultSection  = "DEFAULT"
 
 
 baseSiteObject :: Foundation.JRState
-baseSiteObject = Foundation.JRState True 120 Nothing "users.sqlite" "jackrose-keys.aes" TextItem.nullText False
+baseSiteObject = Foundation.JRState True 120 Nothing "users.sqlite" "jackrose-keys.aes" DT.empty False
 
 
 defaultConfigFileName :: String
