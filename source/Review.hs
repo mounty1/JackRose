@@ -9,36 +9,36 @@ Stability: experimental
 Portability: undefined
 -}
 
-module Review (getHomeR, postHomeR) where
+module Review (getHomeR, postHomeR, getLoginR) where
 
 
 import qualified Yesod as Y
 import qualified Yesod.Auth as YA
 import qualified Yesod.Core as YC
-import qualified Control.Applicative as CA ((<$>), (<*>))
+import Control.Applicative ((<$>), (<*>))
 import qualified Foundation
-import qualified Data.Text as DT (Text)
-import qualified Data.Maybe as DM
+import Data.Text (Text)
 import qualified ReviewPage (review)
+import qualified AuthoriStyle (Style(..))
 
 
 getHomeR, postHomeR :: Foundation.Handler Y.Html
 
-getHomeR = YA.maybeAuthId >>= DM.maybe loginPlease ReviewPage.review
+getHomeR = YA.maybeAuthId >>= maybe loginPlease ReviewPage.review
 -- ^ verify that a user be logged-in, and if s/he be, present the next item for review.
 
-postHomeR = YA.maybeAuthId >>= DM.maybe loginPlease score
+postHomeR = YA.maybeAuthId >>= maybe loginPlease score
 -- ^ user has scored their item so re-schedule it and move to the next.
 
 
 -- http://lusku.de/blog/entry/1 for how to handle grade buttons
 -- | user has pressed a 'score' button; update database with new review and go to next item
-score :: DT.Text -> Foundation.Handler YC.Html
+score :: Text -> Foundation.Handler YC.Html
 score username =
-	(Y.runInputPost $ triple CA.<$> Y.iopt Y.textField "load" CA.<*> Y.iopt Y.textField "grade" CA.<*> Y.iopt Y.textField "logout") >>= enaction
+	(Y.runInputPost $ triple <$> Y.iopt Y.textField "load" <*> Y.iopt Y.textField "grade" <*> Y.iopt Y.textField "logout") >>= enaction
 
 
-type OpText = Maybe DT.Text
+type OpText = Maybe Text
 
 
 triple :: OpText -> OpText -> OpText -> (OpText, OpText, OpText)
@@ -54,6 +54,19 @@ enaction (Nothing, Just grade, _) = goHome
 enaction (Nothing, Nothing, Just _) = YC.redirect (Foundation.AuthR YA.LogoutR)
 -- "this should never happen";  not sure what to do here.
 enaction (Nothing, Nothing, Nothing) = goHome
+
+
+getLoginR :: Text -> Foundation.Handler YC.Html
+getLoginR acctName = YC.getYesod >>= setAcctIfTrusted acctName
+
+
+-- setAcctIfTrusted :: Text -> Foundation.Handler YC.Html
+setAcctIfTrusted acctName site = setAcctIfTrusted' acctName (Foundation.howAuthorised site)
+
+
+-- setAcctIfTrusted :: Text -> Foundation.Handler YC.Html
+setAcctIfTrusted' acctName AuthoriStyle.Email = goHome
+setAcctIfTrusted' acctName AuthoriStyle.Trust = YC.setSession YA.credsKey acctName >> goHome
 
 
 loginPlease, goHome :: Foundation.Handler YC.Html

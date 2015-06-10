@@ -18,8 +18,9 @@ executable JackRose
                       ConfigFile,
                       mtl,
                       transformers,
+                      xml,
                       xml-conduit,
-                      system-filepath,
+                      filepath,
                       blaze-html,
                       resourcet,
                       mime-mail,
@@ -28,5 +29,5 @@ executable JackRose
                       yesod-auth-hashdb,
                       persistent,
                       persistent-template,
-                      persistent-sqlite <2.1.4,
+                      persistent-sqlite,
                       containers

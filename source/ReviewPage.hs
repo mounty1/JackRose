@@ -12,22 +12,22 @@ module ReviewPage (review) where
 
 import qualified Yesod.Core as YC
 import qualified Foundation
-import qualified Data.Text as DT (Text, pack, concat, singleton)
+import qualified Data.Text as DT (Text, pack, unpack, concat, singleton)
 import qualified Text.XML as XML
-import qualified Filesystem.Path.CurrentOS as FP
 import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse)
+import qualified Data.Maybe as DMy
 
 
 -- | show next item for review, for the logged-in user
 review :: DT.Text -> Foundation.Handler YC.Html
 review username = (YC.liftIO $ XML.readFile XML.def content) >>= return . BZH.toHtml . mashAround where
-	fileName = DT.concat [username, DT.pack ".xml"]
-	content = FP.fromText fileName
+	fileName = DT.concat [username, DT.pack ".cfg"]
+	content = DT.unpack fileName
 
 
-mashAround (XML.Document (XML.Prologue [] Nothing []) content []) = XML.Document standardPrologue (embed content) []
+mashAround (XML.Document _ content []) = XML.Document standardPrologue (embed $ divTop $ DMy.fromJust $ eXMLtract worm content) []
 
 
 standardPrologue =
@@ -35,6 +35,32 @@ standardPrologue =
 		[XML.MiscInstruction (XML.Instruction (DT.pack "xml") (DT.pack "version=\"1.0\" encoding=\"UTF-8\""))]
 		(Just (XML.Doctype (DT.pack "html") Nothing))
 		[]
+
+
+worm = map DT.pack [ "source", "category", "view", "back" ]
+
+
+divTop :: XML.Element -> XML.Element
+divTop (XML.Element _ attrs children) = XML.Element (nameXML "div") addClass children where
+	addClass = DM.insertWith prepend (nameXML "class") (DT.pack "all") attrs
+	prepend :: DT.Text -> DT.Text -> DT.Text
+	prepend new old = DT.concat [new, DT.singleton ' ', old]
+
+
+eXMLtract :: [DT.Text] -> XML.Element -> Maybe XML.Element
+eXMLtract [] node = Just node
+eXMLtract (name:rest) (XML.Element _ attrs children) =
+	if null namedChildren then
+		Nothing
+	else
+		Just $ head namedChildren where
+	namedChildren = DMy.catMaybes $ map namedSubNode children
+	namedSubNode (XML.NodeElement all@(XML.Element (XML.Name thisName _ _) _ _)) =
+		if thisName == name then
+			eXMLtract rest all
+		else
+			Nothing
+	namedSubNode _ = Nothing
 
 
 embed content =
@@ -104,58 +130,58 @@ button name value = makeNode "input" [makeAttribute "type" "submit",
 gradeButton digit = button "grade" [digit]
 
 
-ceeSS = DT.pack ".all {\
-     \font-family: Code2000;\
-     \font-size: 24pt;\
-     \background-color: #00ff80;\
-     \text-align: center;\
-\}\
-\td {\
-     \text-align: left;\
-\}\
-\.greek {\
-     \color: #20198c;\
-\}\
-\*[mood=I]::before { content: \"Ⓘ\"; }\
-\*[mood=i]::before { content: \"ⓘ\"; }\
-\*[mood=O]::before { content: \"Ⓞ\"; }\
-\*[mood=S]::before { content: \"Ⓢ\"; }\
-\*[tense=r]::after { content: \"præs.\"; }\
-\*[tense=f]::after { content: \"fut.\"; }\
-\*[tense=m]::after { content: \"impf.\"; }\
-\*[tense=R]::after { content: \"Ⓡ\"; }\
-\*[tense=k]::after { content: \"perf.\"; }\
-\*[tense=Q]::after { content: \"Ⓠ\"; }\
-\*[voice=A]::after { content: \"Ⓐ\"; }\
-\*[voice=M]::after { content: \"Ⓜ\"; }\
-\*[voice=MP]::after { content: \"ⓂⓅ\"; }\
-\*[voice=D]::after { content: \"Ⓟ\"; }\
-\.comment {\
-     \font-size: 16pt;\
-     \font-style: italic;\
-     \text-align: left;\
-\}\
-\.instruction {\
-     \text-align: right;\
-     \font-size: 20pt;\
-     \font-style: italic;\
-\}\
-\* {\
-	\margin: 0;\
-\}\
-\html, body {\
-	\height: 100%;\
-\}\
-\div:first-child {\
-	\min-height: 100%;\
-	\height: auto !important;\
-	\height: 100%;\
-	\margin: 0 auto -3em;\
-\}\
-\div + div {\
-	\height: 1em;\
-\}\
-\html body table tr td form {\
-     \font-size: 20pt;\
-	\text-align: center;\
+ceeSS = DT.pack ".all {\n\
+     \font-family: Code2000;\n\
+     \font-size: 24pt;\n\
+     \background-color: #00ff80;\n\
+     \text-align: center;\n\
+\}\n\
+\td {\n\
+     \text-align: left;\n\
+\}\n\
+\.greek {\n\
+     \color: #20198c;\n\
+\}\n\
+\*[mood=I]::before { content: \"Ⓘ\"; }\n\
+\*[mood=i]::before { content: \"ⓘ\"; }\n\
+\*[mood=O]::before { content: \"Ⓞ\"; }\n\
+\*[mood=S]::before { content: \"Ⓢ\"; }\n\
+\*[tense=r]::after { content: \"præs.\"; }\n\
+\*[tense=f]::after { content: \"fut.\"; }\n\
+\*[tense=m]::after { content: \"impf.\"; }\n\
+\*[tense=R]::after { content: \"Ⓡ\"; }\n\
+\*[tense=k]::after { content: \"perf.\"; }\n\
+\*[tense=Q]::after { content: \"Ⓠ\"; }\n\
+\*[voice=A]::after { content: \"Ⓐ\"; }\n\
+\*[voice=M]::after { content: \"Ⓜ\"; }\n\
+\*[voice=MP]::after { content: \"ⓂⓅ\"; }\n\
+\*[voice=D]::after { content: \"Ⓟ\"; }\n\
+\.comment {\n\
+     \font-size: 16pt;\n\
+     \font-style: italic;\n\
+     \text-align: left;\n\
+\}\n\
+\.instruction {\n\
+     \text-align: right;\n\
+     \font-size: 20pt;\n\
+     \font-style: italic;\n\
+\}\n\
+\* {\n\
+	\margin: 0;\n\
+\}\n\
+\html, body {\n\
+	\height: 100%;\n\
+\}\n\
+\div:first-child {\n\
+	\min-height: 100%;\n\
+	\height: auto !important;\n\
+	\height: 100%;\n\
+	\margin: 0 auto -3em;\n\
+\}\n\
+\div + div {\n\
+	\height: 1em;\n\
+\}\n\
+\html body table tbody tr td form {\n\
+     \font-size: 20pt;\n\
+	\text-align: center;\n\
 \}"

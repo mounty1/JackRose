@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, ViewPatterns #-}
 
 {-|
 Description: Yesod 'master' data
@@ -25,7 +25,9 @@ import qualified Yesod.Auth.Account as YAA
 import qualified Authorisation (User, SqlBackend, persistAction)
 import qualified RouteData
 import qualified EmailVerification
-import qualified Data.Text as DT (Text, concat)
+import Data.Text (Text)
+import qualified Data.Text as DT (concat)
+import qualified AuthoriStyle (Style)
 
 
 -- | The foundation object
@@ -33,11 +35,12 @@ data JRState = JRState {
 		secureOnly :: Bool,  -- ^ restrict connections to HTTPS
 		sessionTimeout :: Int,  -- ^ in minutes
 		portNumber :: Maybe Int,    -- ^ useful to override for non-privileged testing
-		authTable :: DT.Text,
+		authTable :: Text,
 			-- ^ SQLite3 file of authorised users.  Light usage so don't keep an open connection or pool.
 		keysFile :: FilePath,  -- ^ AES keys
-		appRoot :: DT.Text, -- ^ needed for identification emails
-		debugging :: Bool   -- ^ output more information
+		appRoot :: Text, -- ^ needed for identification emails
+		debugging :: Bool,   -- ^ output more information
+		howAuthorised :: AuthoriStyle.Style
 	}
 
 
@@ -76,7 +79,7 @@ instance YAA.YesodAuthAccount (YAA.AccountPersistDB JRState Authorisation.User) 
 	runAccountDB = YAA.runAccountPersistDB
 
 
-emailEnaction :: (YC.MonadHandler m, YC.HandlerSite m ~ JRState) => (t -> t1 -> DT.Text -> m b) -> t -> t1 -> DT.Text -> m b
+emailEnaction :: (YC.MonadHandler m, YC.HandlerSite m ~ JRState) => (t -> t1 -> Text -> m b) -> t -> t1 -> Text -> m b
 emailEnaction action uname email url = YC.getYesod >>= enact where
 	enact site = action uname email fullURL where
 		fullURL = DT.concat [appRoot site, url]

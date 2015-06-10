@@ -19,6 +19,7 @@ import qualified Control.Monad.Except as CME
 import qualified Data.List as DL (lookup)
 import qualified Data.Maybe as DM
 import qualified Foundation (JRState(..))
+import qualified AuthoriStyle (Style(..))
 
 
 siteObject :: CommandArgs.CmdLineArgs -> IO Foundation.JRState
@@ -71,6 +72,7 @@ siteAlterMap = [
 	("portNumber", AI (\site t -> site{Foundation.portNumber = Just t})),
 	("userDatabase", AS (\site t -> site{Foundation.authTable = DT.pack t})),
 	("appRoot", AS (\site t -> site{Foundation.appRoot = DT.pack t})),
+	("trustedSite", AB (\site t -> if t then site{Foundation.howAuthorised = AuthoriStyle.Trust} else site)),
 	("keysFile", AS (\site t -> site{Foundation.keysFile = t}))
 	]
 
@@ -80,7 +82,7 @@ defaultSection  = "DEFAULT"
 
 
 baseSiteObject :: Foundation.JRState
-baseSiteObject = Foundation.JRState True 120 Nothing "users.sqlite" "jackrose-keys.aes" DT.empty False
+baseSiteObject = Foundation.JRState True 120 Nothing "users.sqlite" "jackrose-keys.aes" DT.empty False AuthoriStyle.Email
 
 
 defaultConfigFileName :: String

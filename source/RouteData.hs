@@ -25,4 +25,5 @@ routeData :: [YT.ResourceTree String]
 routeData = [YC.parseRoutes|
 	/ HomeR GET POST
 	/auth AuthR YA.Auth YA.getAuth
+	/account/#Text LoginR GET
 	|]

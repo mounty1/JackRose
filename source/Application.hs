@@ -11,7 +11,8 @@ where it is subject to the various LANGUAGE extensions, and perform 'real'
 processing where all this black magic isn't in effect.
 -}
 
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, FlexibleInstances, TypeFamilies, MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell, OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns, TypeFamilies, MultiParamTypeClasses #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -20,7 +21,7 @@ module Application () where
 
 import qualified Yesod
 import qualified Yesod.Auth as YA
-import Review (getHomeR, postHomeR)
+import Review (getHomeR, postHomeR, getLoginR)
 import Foundation
 
 
