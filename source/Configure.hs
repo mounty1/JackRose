@@ -71,6 +71,7 @@ siteAlterMap = [
 	("sessionMinutes", AI (\site t -> site{Foundation.sessionTimeout = t})),
 	("portNumber", AI (\site t -> site{Foundation.portNumber = Just t})),
 	("userDatabase", AS (\site t -> site{Foundation.authTable = DT.pack t})),
+	("itemDatabase", AS (\site t -> site{Foundation.itemTable = DT.pack t})),
 	("appRoot", AS (\site t -> site{Foundation.appRoot = DT.pack t})),
 	("trustedSite", AB (\site t -> if t then site{Foundation.howAuthorised = AuthoriStyle.Trust} else site)),
 	("keysFile", AS (\site t -> site{Foundation.keysFile = t}))
@@ -82,7 +83,7 @@ defaultSection  = "DEFAULT"
 
 
 baseSiteObject :: Foundation.JRState
-baseSiteObject = Foundation.JRState True 120 Nothing "users.sqlite" "jackrose-keys.aes" DT.empty False AuthoriStyle.Email
+baseSiteObject = Foundation.JRState True 120 Nothing "users.sqlite" "items.sqlite" "jackrose-keys.aes" DT.empty False AuthoriStyle.Email
 
 
 defaultConfigFileName :: String

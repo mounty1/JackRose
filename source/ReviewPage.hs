@@ -12,24 +12,38 @@ module ReviewPage (review) where
 
 import qualified Yesod.Core as YC
 import qualified Foundation
-import qualified Data.Text as DT (Text, pack, unpack, concat, singleton)
+import qualified Data.Text as DT (Text, pack, unpack, singleton, append)
 import qualified Text.XML as XML
 import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse)
-import qualified Data.Maybe as DMy
+import qualified ConfigParse (content, UserSchema(..), Logged(..), SchemaParsing, View(..))
+import qualified FailureMessage (page)
+import qualified Logging
+import qualified Data.Maybe as DMy (fromMaybe)
 
 
 -- | show next item for review, for the logged-in user
 review :: DT.Text -> Foundation.Handler YC.Html
-review username = (YC.liftIO $ XML.readFile XML.def content) >>= return . BZH.toHtml . mashAround where
-	fileName = DT.concat [username, DT.pack ".cfg"]
-	content = DT.unpack fileName
+review username = YC.getYesod >>= pong where
+	pong base = (YC.liftIO $ XML.readFile XML.def (DT.unpack contentName)) >>= digest . ConfigParse.content contentName (Foundation.debugging base) where
+	contentName = username `DT.append` (DT.pack ".cfg")
 
 
-mashAround (XML.Document _ content []) = XML.Document standardPrologue (embed $ divTop $ DMy.fromJust $ eXMLtract worm content) []
+digest :: ConfigParse.SchemaParsing -> Foundation.Handler YC.Html
+
+digest (Left failReason) = FailureMessage.page failReason
+
+digest (Right (ConfigParse.Logged warnings info (ConfigParse.UserSchema _ views))) =
+	mapM_ Logging.logWarn warnings >> mapM_ Logging.logInfo (DMy.fromMaybe [] info) >> (return $ BZH.toHtml $ mashAround views)
 
 
+mashAround :: [ConfigParse.View] -> XML.Document
+mashAround (ConfigParse.View _ _ obverse _ : _) = XML.Document standardPrologue (embed (XML.Element (nameXML "Question") DM.empty obverse)) []
+mashAround [] = XML.Document standardPrologue (embed (XML.Element (nameXML "boing boing") DM.empty [])) []
+
+
+standardPrologue :: XML.Prologue
 standardPrologue =
 	XML.Prologue
 		[XML.MiscInstruction (XML.Instruction (DT.pack "xml") (DT.pack "version=\"1.0\" encoding=\"UTF-8\""))]
@@ -37,32 +51,7 @@ standardPrologue =
 		[]
 
 
-worm = map DT.pack [ "source", "category", "view", "back" ]
-
-
-divTop :: XML.Element -> XML.Element
-divTop (XML.Element _ attrs children) = XML.Element (nameXML "div") addClass children where
-	addClass = DM.insertWith prepend (nameXML "class") (DT.pack "all") attrs
-	prepend :: DT.Text -> DT.Text -> DT.Text
-	prepend new old = DT.concat [new, DT.singleton ' ', old]
-
-
-eXMLtract :: [DT.Text] -> XML.Element -> Maybe XML.Element
-eXMLtract [] node = Just node
-eXMLtract (name:rest) (XML.Element _ attrs children) =
-	if null namedChildren then
-		Nothing
-	else
-		Just $ head namedChildren where
-	namedChildren = DMy.catMaybes $ map namedSubNode children
-	namedSubNode (XML.NodeElement all@(XML.Element (XML.Name thisName _ _) _ _)) =
-		if thisName == name then
-			eXMLtract rest all
-		else
-			Nothing
-	namedSubNode _ = Nothing
-
-
+embed :: XML.Element -> XML.Element
 embed content =
 	XML.Element
 		(nameXML "html")
@@ -101,35 +90,45 @@ embed content =
 	]
 
 
+oneSpace :: XML.Node
 oneSpace = XML.NodeContent $ DT.singleton ' '
 
 
+nameXML :: String -> XML.Name
 nameXML string = XML.Name (DT.pack string) Nothing Nothing
 
 
+postAttr :: [(XML.Name, DT.Text)]
 postAttr = [makeAttribute "method" "post"]
 
 
+alignAttr :: [Char] -> [(XML.Name, DT.Text)]
 alignAttr string = [makeAttribute "style" ("text-align:" ++ string ++ ";")]
 
 
+button1 :: String -> XML.Node
 button1 name = button name name
 
 
+makeAttribute :: String -> String -> (XML.Name, DT.Text)
 makeAttribute attr value = (nameXML attr, DT.pack value)
 
 
+makeNode :: String -> [(XML.Name, DT.Text)] -> [XML.Node] -> XML.Node
 makeNode name attrs subs = XML.NodeElement $ XML.Element (nameXML name) (DM.fromList attrs) subs
 
 
+button :: String -> String -> XML.Node
 button name value = makeNode "input" [makeAttribute "type" "submit",
 					makeAttribute "name" name,
 					makeAttribute "value" value] []
 
 
+gradeButton :: Char -> XML.Node
 gradeButton digit = button "grade" [digit]
 
 
+ceeSS :: DT.Text
 ceeSS = DT.pack ".all {\n\
      \font-family: Code2000;\n\
      \font-size: 24pt;\n\

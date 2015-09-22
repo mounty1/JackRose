@@ -37,6 +37,8 @@ data JRState = JRState {
 		portNumber :: Maybe Int,    -- ^ useful to override for non-privileged testing
 		authTable :: Text,
 			-- ^ SQLite3 file of authorised users.  Light usage so don't keep an open connection or pool.
+		itemTable :: Text,
+			-- ^ SQLite3 file of learnt items for users.  Heavier usage.
 		keysFile :: FilePath,  -- ^ AES keys
 		appRoot :: Text, -- ^ needed for identification emails
 		debugging :: Bool,   -- ^ output more information

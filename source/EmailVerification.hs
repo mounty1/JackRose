@@ -36,6 +36,8 @@ logAccountEmail uname email url action =
 	Logging.logInfo $ DT.concat [ DT.pack action, DT.pack " email for ", uname, DT.pack " (", email, DT.pack "): ", url ]
 
 
+-- | http://nginx.com/resources/admin-guide/reverse-proxy/ section "Passing Request Headers" for more details
+-- | we need this to get the external URL of the service.
 makeEmail :: DT.Text -> DT.Text -> DT.Text -> Mime.Mail
 makeEmail uname email url =
 	Mime.simpleMail'

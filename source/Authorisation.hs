@@ -11,7 +11,7 @@ Portability: undefined
 {-# LANGUAGE FlexibleContexts, TemplateHaskell #-}
 {-# LANGUAGE GADTs, MultiParamTypeClasses #-}
 
-module Authorisation (upgradeDB, User, persistAction, PerstQ.SqlBackend) where
+module Authorisation (upgradeDB, User, UserId, persistAction, PerstQ.SqlBackend) where
 
 import qualified Database.Persist.Sqlite as PerstQ
 import qualified Yesod as Y

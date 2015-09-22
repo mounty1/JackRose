@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-|
 Description: Item review pages;  show page and take user score
@@ -20,6 +20,7 @@ import qualified Foundation
 import Data.Text (Text)
 import qualified ReviewPage (review)
 import qualified AuthoriStyle (Style(..))
+import qualified Login (load)
 
 
 getHomeR, postHomeR :: Foundation.Handler Y.Html
@@ -60,13 +61,13 @@ getLoginR :: Text -> Foundation.Handler YC.Html
 getLoginR acctName = YC.getYesod >>= setAcctIfTrusted acctName
 
 
--- setAcctIfTrusted :: Text -> Foundation.Handler YC.Html
+setAcctIfTrusted :: Text -> Foundation.JRState -> Foundation.Handler YC.Html
 setAcctIfTrusted acctName site = setAcctIfTrusted' acctName (Foundation.howAuthorised site)
 
 
--- setAcctIfTrusted :: Text -> Foundation.Handler YC.Html
+setAcctIfTrusted' :: Text -> AuthoriStyle.Style -> Foundation.Handler YC.Html
 setAcctIfTrusted' acctName AuthoriStyle.Email = goHome
-setAcctIfTrusted' acctName AuthoriStyle.Trust = YC.setSession YA.credsKey acctName >> goHome
+setAcctIfTrusted' acctName AuthoriStyle.Trust = Login.load acctName >> goHome
 
 
 loginPlease, goHome :: Foundation.Handler YC.Html

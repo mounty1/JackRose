@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, MultiParamTypeClasses #-}
-
 {-|
 Description: TH argument;  isolated to contain the scope of LANGUAGE extensions.
 Copyright: (c) Michael Mounteney, 2015
@@ -9,7 +7,7 @@ Stability: experimental
 Portability: undefined
 -}
 
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell, MultiParamTypeClasses, QuasiQuotes #-}
 
 
 module RouteData (routeData) where
