@@ -66,7 +66,7 @@ embed content =
 			makeNode "style" [] [XML.NodeContent ceeSS]
 			],
 		makeNode "body"
-			[]
+			[makeAttribute "class" "all"]
 			[XML.NodeElement content,
 			makeNode "div" [] [makeNode "hr" [] []],
 			makeNode "table"
