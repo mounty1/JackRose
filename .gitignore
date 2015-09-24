@@ -1,7 +1,11 @@
-sandbox/
 site/
 .directory
 JackRose.xcf
 source/.halcyon
 source/dist
 source/gentoo
+sandbox/items.sqlite
+sandbox/jackrose-keys.aes
+sandbox/sample.css
+sandbox/sample.html
+sandbox/users.sqlite

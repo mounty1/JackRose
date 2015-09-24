@@ -81,8 +81,8 @@ the account.
 Modify {yourloginname}.cfg to taste.
 
 Finally, run JackRose
-Centos7# /app/platform/JackRose -c ./jackrose.cfg
-Gentoo$ ../source/gentoo/dist/JackRose/JackRose -c ./jackrose.cfg
+Centos7# cd JackRose/sandbox ; /app/bin/JackRose -c ./jackrose.cfg
+Gentoo$  cd JackRose/sandbox ; ../source/gentoo/dist/JackRose/JackRose -c ./jackrose.cfg
 
 
 4  Connecting to JackRose from a web browser.
