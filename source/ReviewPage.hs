@@ -39,8 +39,8 @@ digest (Right (ConfigParse.Logged warnings info (ConfigParse.UserSchema _ views)
 
 
 mashAround :: [ConfigParse.View] -> XML.Document
-mashAround (ConfigParse.View _ _ obverse _ : _) = XML.Document standardPrologue (embed (XML.Element (nameXML "Question") DM.empty obverse)) []
-mashAround [] = XML.Document standardPrologue (embed (XML.Element (nameXML "boing boing") DM.empty [])) []
+mashAround (ConfigParse.View _ _ obverse _ : _) = XML.Document standardPrologue (embed obverse) []
+mashAround [] = XML.Document standardPrologue (embed []) []
 
 
 standardPrologue :: XML.Prologue
@@ -51,7 +51,7 @@ standardPrologue =
 		[]
 
 
-embed :: XML.Element -> XML.Element
+embed :: [XML.Node] -> XML.Element
 embed content =
 	XML.Element
 		(nameXML "html")
@@ -67,7 +67,7 @@ embed content =
 			],
 		makeNode "body"
 			[makeAttribute "class" "all"]
-			[XML.NodeElement content,
+			[makeNode "div" [] content,
 			makeNode "div" [] [makeNode "hr" [] []],
 			makeNode "table"
 				[makeAttribute "width" "100%"]

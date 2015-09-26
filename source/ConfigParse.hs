@@ -17,7 +17,6 @@ debugging option is passed in.
 
 module ConfigParse (UserSchema(..),
 		SchemaParsing,
-		UserDataSources,
 		DataSource,
 		DataVariant(..),
 		View(..),
@@ -59,9 +58,6 @@ type ParsingResult a = Either DT.Text (Logged a)
 type SchemaParsing = ParsingResult UserSchema
 
 
-type UserDataSources = [DataSource]
-
-
 data DataSource = DataSource DT.Text DT.Text DataVariant
 
 
@@ -84,7 +80,7 @@ data View = View {
 
 
 data UserSchema = UserSchema {
-		sources :: UserDataSources,  -- ^ read-only data sources.
+		sources :: [DataSource],  -- ^ read-only data sources.
 		views :: [View]
 	}
 
