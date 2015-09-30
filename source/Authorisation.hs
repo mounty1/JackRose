@@ -7,11 +7,14 @@ Stability: experimental
 Portability: undefined
 -}
 
+
 {-# LANGUAGE QuasiQuotes, TypeFamilies, GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts, TemplateHaskell #-}
 {-# LANGUAGE GADTs, MultiParamTypeClasses #-}
 
+
 module Authorisation (upgradeDB, User, UserId, persistAction, PerstQ.SqlBackend) where
+
 
 import qualified Database.Persist.Sqlite as PerstQ
 import qualified Yesod as Y

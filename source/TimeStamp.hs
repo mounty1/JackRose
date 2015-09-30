@@ -7,6 +7,7 @@ Stability: experimental
 Portability: undefined
 -}
 
+
 module TimeStamp (Stamp(..), now, timeZero, isTimeZero, plus) where
 
 

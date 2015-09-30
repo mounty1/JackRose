@@ -1,6 +1,3 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, ViewPatterns #-}
-
 {-|
 Description: Yesod 'master' data
 Copyright: (c) Michael Mounteney, 2015
@@ -14,6 +11,11 @@ with the TH magic, to avoid module namespaces.  Therefore all symbols are
 exported (even selective exporting doesn't work) and the module is imported
 without @qualified@.
 -}
+
+
+{-# LANGUAGE TemplateHaskell, OverloadedStrings, TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, ViewPatterns #-}
+
 
 module Foundation where
 

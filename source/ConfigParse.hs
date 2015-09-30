@@ -13,15 +13,11 @@ informational messages.  The informational messages include debugging messages i
 debugging option is passed in.
 -}
 
+
 {-# LANGUAGE OverloadedStrings #-}
 
-module ConfigParse (UserSchema(..),
-		SchemaParsing,
-		DataSource,
-		DataVariant(..),
-		View(..),
-		Logged(..),
-		content) where
+
+module ConfigParse (UserSchema(..), SchemaParsing, View(..), Logged(..), content) where
 
 
 import qualified Data.Text as DT (Text, concat, append, singleton, all)
@@ -32,6 +28,7 @@ import qualified Data.Map as DM
 import qualified Data.Maybe as DMy
 import qualified Data.Char as DC (isSpace)
 import Control.Applicative ((<$>))
+import qualified DataSource
 
 
 -- | Version of the configuration file schema.  This is incremented only
@@ -58,21 +55,11 @@ type ParsingResult a = Either DT.Text (Logged a)
 type SchemaParsing = ParsingResult UserSchema
 
 
-data DataSource = DataSource DT.Text DT.Text DataVariant
-
-
 type Attributes = DM.Map XML.Name DT.Text
 
 
-data DataVariant
-		= Postgres { server :: DT.Text, port :: Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text }
-		| Sqlite3 { tableName :: DT.Text }
-		| CSV { separator :: Char, fileCSV :: DT.Text }
-		| XMLSource { fileXML :: DT.Text }
-
-
 data View = View {
-		dataSource :: DataSource,
+		dataSource :: DataSource.DataSource,
 		label :: DT.Text,
 		obverse :: [XML.Node],
 		backside :: [XML.Node]
@@ -80,7 +67,7 @@ data View = View {
 
 
 data UserSchema = UserSchema {
-		sources :: [DataSource],  -- ^ read-only data sources.
+		sources :: [DataSource.DataSource],  -- ^ read-only data sources.
 		views :: [View]
 	}
 
@@ -177,14 +164,14 @@ schemaItem context (XML.Element (XML.Name "source" Nothing Nothing) attrs childr
 	attrList context attrs ["UID", "name", "form"]
 		>>= formDataSource
 		>>= oneSource context children schema where
-		formDataSource [uid, name, form] = DataSource uid name <$> dataSourceVariant context form attrs
+		formDataSource [uid, name, form] = DataSource.DataSource uid name <$> dataSourceVariant context form attrs
 
 schemaItem context (XML.Element (XML.Name other _ _) _ _) _ =
 	failToParse context invalidItem
 
 
 -- | Parse the nodes directly within a @<source>@
-oneSource :: XMLFileContext -> [XML.Node] -> Logged UserSchema -> DataSource -> SchemaParsing
+oneSource :: XMLFileContext -> [XML.Node] -> Logged UserSchema -> DataSource.DataSource -> SchemaParsing
 oneSource _ [] schema source = Right schema{payload = (payload schema){sources = source : sources (payload schema)}}
 oneSource context (XML.NodeElement element : xs) schema source = sourceItem (tagText element : context) element schema source >>= \sch -> oneSource context xs sch source
 oneSource context (XML.NodeInstruction _ : xs) schema source = oneSource context xs schema source
@@ -197,7 +184,7 @@ oneSource context (XML.NodeContent text : xs) schema source =
 
 
 -- | Parse @<tag>@s directly within a @<source>@
-sourceItem :: XMLFileContext -> XML.Element -> Logged UserSchema -> DataSource -> SchemaParsing
+sourceItem :: XMLFileContext -> XML.Element -> Logged UserSchema -> DataSource.DataSource -> SchemaParsing
 
 sourceItem _ (XML.Element (XML.Name "template" Nothing Nothing) _ _) schema _ =
 	Right schema{warnings = "Unimplemented <template>" : warnings schema}
@@ -254,21 +241,21 @@ viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context 
 
 
 -- | Determine data source class, specified entirely in attributes of <source>
-dataSourceVariant :: XMLFileContext -> DT.Text -> Attributes -> Either DT.Text DataVariant
+dataSourceVariant :: XMLFileContext -> DT.Text -> Attributes -> Either DT.Text DataSource.DataVariant
 
 dataSourceVariant context "Postgres" attrs =
-	(\[thisServer, thisDatabase, thisTable] -> Postgres thisServer portNo thisDatabase nameSpace thisTable) <$> attrList context attrs [ "server", "database", "table" ] where
+	(\[thisServer, thisDatabase, thisTable] -> DataSource.Postgres thisServer portNo thisDatabase nameSpace thisTable) <$> attrList context attrs [ "server", "database", "table" ] where
 	portNo = DMy.fromMaybe 9001 (maybeIntAttrValue "port" attrs)
 	nameSpace = maybeAttrValue "namespace" attrs
 
 dataSourceVariant context "SQLite3" attrs =
-	(\[ fileName ] -> Sqlite3 fileName) <$> attrList context attrs [ "filename" ]
+	(\[ fileName ] -> DataSource.Sqlite3 fileName) <$> attrList context attrs [ "filename" ]
 
 dataSourceVariant context "CSV" attrs =
-	(\[ separator, file ] -> CSV '\t' file) <$> attrList context attrs [ "separator", "file" ]
+	(\[ separator, file ] -> DataSource.CSV '\t' file) <$> attrList context attrs [ "separator", "file" ]
 
 dataSourceVariant context "XML" attrs =
-	(\[ file ] -> XMLSource file) <$> attrList context attrs [ "file" ]
+	(\[ file ] -> DataSource.XMLSource file) <$> attrList context attrs [ "file" ]
 
 dataSourceVariant context form _ = failToParse context ["Invalid form \"", form, "\""]
 

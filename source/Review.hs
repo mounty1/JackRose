@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 {-|
 Description: Item review pages;  show page and take user score
 Copyright: (c) Michael Mounteney, 2015
@@ -9,8 +7,11 @@ Stability: experimental
 Portability: undefined
 -}
 
-module Review (getHomeR, postHomeR, getLoginR) where
 
+{-# LANGUAGE OverloadedStrings #-}
+
+
+module Review (getHomeR, postHomeR, getLoginR) where
 
 import qualified Yesod as Y
 import qualified Yesod.Auth as YA

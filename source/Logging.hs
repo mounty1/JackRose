@@ -7,7 +7,9 @@ Stability: experimental
 Portability: undefined
 -}
 
+
 {-# LANGUAGE TemplateHaskell #-}
+
 
 module Logging (logInfo, logWarn) where
 

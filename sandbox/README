@@ -55,7 +55,7 @@ entirely separate from the build on other platforms.
 3  Running JackRose.
 
 $ cd JackRose/sandbox
-Modify jackrose.cfg to taste.
+Modify jackrose.conf to taste.
 $ mv mounty.cfg {yourloginname}.cfg
 When you connect to JackRose, you will have to set up an account.
 Currently, the only way of configuring your account is to have a server-side
@@ -65,8 +65,8 @@ actually created the account.
 Modify {yourloginname}.cfg to taste.
 
 Finally, run JackRose
-Centos7# cd JackRose/sandbox ; /app/bin/JackRose -c ./jackrose.cfg
-Gentoo$  cd JackRose/sandbox ; ../source/gentoo/dist/JackRose/JackRose -c ./jackrose.cfg
+Centos7# cd JackRose/sandbox ; /app/bin/JackRose -c ./jackrose.conf
+Gentoo$  cd JackRose/sandbox ; ../source/gentoo/dist/JackRose/JackRose -c ./jackrose.conf
 
 
 4  Connecting to JackRose from a web browser.
