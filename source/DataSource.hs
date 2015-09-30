@@ -10,6 +10,9 @@ Data sources are the content of question/answer pairs.  They can be SQL tables, 
 -}
 
 
+{-# LANGUAGE OverloadedStrings #-}
+
+
 module DataSource (DataSource(..), DataVariant(..)) where
 
 
@@ -32,9 +35,10 @@ serialise (Sqlite3 tableName) = DT.concat [ "Q/" ]
 serialise (CSV separator fileCSV) = DT.concat [ "C/" ]
 serialise (XMLSource fileXML) = DT.concat [ "X/" ]
 
-
+{-
 deserialise :: DT.Text -> DataVariant
 deserialise ["P"] = Postgres server port database namespace table
 deserialise ["Q", tableName] = Sqlite3 tableName
 deserialise ["C", separator, fileCSV] = CSV separator fileCSV
 deserialise ["X", fileXML] = XMLSource fileXML
+-}
