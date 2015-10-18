@@ -27,7 +27,7 @@ import qualified Data.Maybe as DMy (fromMaybe)
 -- | show next item for review, for the logged-in user
 review :: DT.Text -> Foundation.Handler YC.Html
 review username = YC.getYesod >>= pong where
-	pong base = (YC.liftIO $ XML.readFile XML.def (DT.unpack contentName)) >>= digest . ConfigParse.content contentName (Foundation.debugging base) where
+	pong base = (YC.liftIO $ XML.readFile XML.def (DT.unpack $ Foundation.userDir base `DT.append` contentName)) >>= digest . ConfigParse.content contentName (Foundation.debugging base) where
 	contentName = username `DT.append` (DT.pack ".cfg")
 
 
