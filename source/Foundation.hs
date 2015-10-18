@@ -37,10 +37,12 @@ data JRState = JRState {
 		secureOnly :: Bool,  -- ^ restrict connections to HTTPS
 		sessionTimeout :: Int,  -- ^ in minutes
 		portNumber :: Maybe Int,    -- ^ useful to override for non-privileged testing
-		authTable :: Text,
-			-- ^ SQLite3 file of authorised users.  Light usage so don't keep an open connection or pool.
-		itemTable :: Text,
-			-- ^ SQLite3 file of learnt items for users.  Heavier usage.
+		tablesFile :: Text,
+			-- ^ name of file containing SQLite3 tables
+		userTemplate :: Text,
+			-- starting template;  copied when a new user account be set up.
+		userDir :: Text,
+			-- directory containing user configurations.
 		keysFile :: FilePath,  -- ^ AES keys
 		appRoot :: Text, -- ^ needed for identification emails
 		debugging :: Bool,   -- ^ output more information
@@ -72,7 +74,7 @@ instance YC.Yesod JRState where
 
 instance Y.YesodPersist JRState where
 	type YesodPersistBackend JRState = Authorisation.SqlBackend
-	runDB action = YC.getYesod >>= (\site -> Authorisation.persistAction action (authTable site))
+	runDB action = YC.getYesod >>= (\site -> Authorisation.persistAction action (tablesFile site))
 
 
 instance YC.RenderMessage JRState Y.FormMessage where

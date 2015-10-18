@@ -4,8 +4,8 @@ JackRose.xcf
 source/.halcyon
 source/dist
 source/gentoo
-sandbox/items.sqlite
-sandbox/jackrose-keys.aes
-sandbox/sample.css
-sandbox/sample.html
-sandbox/users.sqlite
+sandbox/jackrose.aes
+sandbox/jackrose.sqlite
+sandbox/jackrose.sqlite-wal
+sandbox/jackrose.sqlite-shm
+sandbox/users/

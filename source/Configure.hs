@@ -72,8 +72,9 @@ siteAlterMap = [
 	("secureSession", AB (\site t -> site{Foundation.secureOnly = t})),
 	("sessionMinutes", AI (\site t -> site{Foundation.sessionTimeout = t})),
 	("portNumber", AI (\site t -> site{Foundation.portNumber = Just t})),
-	("userDatabase", AS (\site t -> site{Foundation.authTable = DT.pack t})),
-	("itemDatabase", AS (\site t -> site{Foundation.itemTable = DT.pack t})),
+	("tablesFile", AS (\site t -> site{Foundation.tablesFile = DT.pack t})),
+	("userTemplate", AS (\site t -> site{Foundation.userTemplate = DT.pack t})),
+	("userDir", AS (\site t -> site{Foundation.userDir = DT.pack t})),
 	("appRoot", AS (\site t -> site{Foundation.appRoot = DT.pack t})),
 	("trustedSite", AB (\site t -> if t then site{Foundation.howAuthorised = AuthoriStyle.Trust} else site)),
 	("keysFile", AS (\site t -> site{Foundation.keysFile = t}))
@@ -85,8 +86,8 @@ defaultSection  = "DEFAULT"
 
 
 baseSiteObject :: Foundation.JRState
-baseSiteObject = Foundation.JRState True 120 Nothing "users.sqlite" "items.sqlite" "jackrose-keys.aes" DT.empty False AuthoriStyle.Email
+baseSiteObject = Foundation.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty False AuthoriStyle.Email
 
 
 defaultConfigFileName :: String
-defaultConfigFileName = "/etc/jackrose.cfg"
+defaultConfigFileName = "/etc/jackrose.conf"

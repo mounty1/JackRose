@@ -75,25 +75,19 @@ data UserSchema = UserSchema {
 type XMLFileContext = [DT.Text]
 
 
-nullSchema :: Bool -> Logged UserSchema
-nullSchema debuggery = Logged [] (if debuggery then Just [] else Nothing) (UserSchema [] [])
-
-
 -- | Parse the users's configuration file.  This might fail (returning a @Left DT.Text@)
 -- or succeed (returning a @Right UserSchema@).
 content :: DT.Text -> Bool -> XML.Document -> SchemaParsing
 
 content sourceName debuggery (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) =
-	DMy.maybe
-		(missingAttr context "version")
-		checkVersionAttrValue
-		(maybeAttrValue "version" attrs) where
-		checkVersionAttrValue version =
+	attrList context attrs [ "version" ] >>= checkVersionAttrValue where
+		checkVersionAttrValue [version] =
 			if version == documentVersionText then
-				contents context children (nullSchema debuggery)
+				contents context children nullSchema
 			else
 				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""]
 		context = [ tagText top, "File=" `DT.append` sourceName ]
+		nullSchema = Logged [] (if debuggery then Just [] else Nothing) (UserSchema [] [])
 
 content sourceName _ (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) =
 	failToParse [ tagText top, "File=" `DT.append` sourceName ] ["document not jackrose"]
@@ -224,7 +218,7 @@ extraAttributes = ["attributes given"]
 invalidItem = ["invalid item"]
 
 
--- | Parse <tag>s within a @<view>@;  there should be just one each of @<front>@ and @<back>@
+-- | Parse @<tag>@s within a @<view>@;  there should be just one each of @<front>@ and @<back>@
 viewPart :: XMLFileContext -> XML.Element -> CardFaces -> Either DT.Text CardFaces
 
 viewPart context (XML.Element (XML.Name "front" Nothing Nothing) attrs children) (Nothing, back) =
@@ -245,7 +239,7 @@ dataSourceVariant :: XMLFileContext -> DT.Text -> Attributes -> Either DT.Text D
 
 dataSourceVariant context "Postgres" attrs =
 	(\[thisServer, thisDatabase, thisTable] -> DataSource.Postgres thisServer portNo thisDatabase nameSpace thisTable) <$> attrList context attrs [ "server", "database", "table" ] where
-	portNo = DMy.fromMaybe 9001 (maybeIntAttrValue "port" attrs)
+	portNo = maybeIntAttrValue "port" attrs
 	nameSpace = maybeAttrValue "namespace" attrs
 
 dataSourceVariant context "SQLite3" attrs =
@@ -270,11 +264,7 @@ attrList _ _ [] = Right []
 
 attrList context attrs (attr : rest) =
 	DMy.maybe
-		(missingAttr context attr)
+		(failToParse context ["missing attribute ", attr])
 		mumble
 		(maybeAttrValue attr attrs) where
 		mumble value = (value :) <$> attrList context attrs rest
-
-
-missingAttr :: XMLFileContext -> DT.Text -> Either DT.Text a
-missingAttr context attrName = failToParse context ["missing attribute ", attrName]
