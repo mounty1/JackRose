@@ -10,81 +10,79 @@ Data sources are the content of question/answer pairs.  They can be SQL tables, 
 -}
 
 
-{-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module DataSource (DataSource(..), DataVariant(..), upgradeDB) where
+module DataSource (DataSource(..), DataVariant(..)) where
 
 
-import qualified Database.Persist.Sqlite as PerstQ
-import qualified Yesod as Y
-import qualified Yesod.Auth.Account as YAA
-import qualified Data.ByteString as DB
-import qualified Data.Text as DT (Text, concat)
-import qualified Control.Monad.Trans.Resource as CMTS (ResourceT)
-import qualified Control.Monad.Logger as CML (NoLoggingT)
-import qualified Control.Monad.Trans.Reader as CMTR (ReaderT)
-import Data.Int (Int64)
+import TextShow (showt)
+import qualified Data.Text as DT (splitOn, Text, singleton, concat, empty, null, isInfixOf, head, length)
+import qualified Data.Text.Read as DTR (decimal)
 
 
 data DataSource = DataSource DT.Text DT.Text DataVariant
 
 
 data DataVariant
-		= Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text }
-		| Sqlite3 { tableName :: DT.Text }
-		| CSV { separator :: Char, fileCSV :: DT.Text }
-		| XMLSource { fileXML :: DT.Text }
+        = Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text }
+        | Sqlite3 { tableName :: DT.Text }
+        | CSV { separator :: Char, fileCSV :: DT.Text }
+        | XMLSource { fileXML :: DT.Text }
 
 
-serialise :: DataVariant -> DT.Text
-serialise (Postgres server port database namespace table) = DT.concat [ "P/" ]
-serialise (Sqlite3 tableName) = DT.concat [ "Q/" ]
-serialise (CSV separator fileCSV) = DT.concat [ "C/" ]
-serialise (XMLSource fileXML) = DT.concat [ "X/" ]
-
-{-
-deserialise :: DT.Text -> DataVariant
-deserialise ["P"] = Postgres server port database namespace table
-deserialise ["Q", tableName] = Sqlite3 tableName
-deserialise ["C", separator, fileCSV] = CSV separator fileCSV
-deserialise ["X", fileXML] = XMLSource fileXML
--}
-
-{- Three tables:
-
-	DataSourceIndex:  one row per table;  maps table reference to UID
-	ViewIndex:  one row per view*datasource:  maps view*datasoure to UID
-	RowIndex:  one row per unique_key*viewIndex
--}
-Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "sourceFlatten"] [Y.persistLowerCase|
-DataSourceIndex
-	sourceSerial DT.Text UNIQUE NOT NULL
-	sourceIndex Int NOT NULL
-	UniqueSourceSerial sourceSerial
-ViewIndex
-	viewUID DT.Text
-	viewIndex Int NOT NULL
-	sourceIndex Int NOT NULL
-	UniqueViewIndex viewIndex viewUID
-RowIndex
-	viewIndex Int NOT NULL
-	key DT.Text NOT NULL
-	rowIndex Int64 NOT NULL
-	UniqueRowIndex key viewIndex
-|]
+showMI :: Maybe Int -> DT.Text
+showMI Nothing = DT.empty
+showMI (Just n) = showt n
 
 
--- | pass in a database action and run it on the users table
-persistAction :: (Y.MonadBaseControl IO m, Y.MonadIO m, Y.MonadLogger m) => PerstQ.SqlPersistT m a -> DT.Text -> m a
-persistAction action table = PerstQ.withSqliteConn table enaction where
-	enaction = PerstQ.runSqlConn action
+showMT :: Maybe DT.Text -> DT.Text
+showMT Nothing = DT.empty
+showMT (Just text) = text
 
 
-upgradeDB :: DT.Text -> IO ()
-upgradeDB table = PerstQ.runSqlite table runrunrun
+fs :: DT.Text
+fs = "/"
 
 
-runrunrun :: CMTR.ReaderT PerstQ.SqlBackend (CML.NoLoggingT (CMTS.ResourceT IO)) ()
-runrunrun = PerstQ.runMigration sourceFlatten
+maybeIntValue :: DT.Text -> Maybe Int
+maybeIntValue = reduceIt . DTR.decimal
+
+
+reduceIt :: Either String (Int, DT.Text) -> Maybe Int
+reduceIt (Right (n, "")) = Just n
+reduceIt _ = Nothing
+
+
+
+enSerialise :: DataVariant -> DT.Text
+enSerialise (Postgres server port database namespace table) = DT.concat [ "P", fs, server, fs, showMI port, fs, database, fs, showMT namespace, fs, table ]
+enSerialise (Sqlite3 tableName) = DT.concat [ "Q", fs, tableName ]
+enSerialise (CSV separator fileCSV) = DT.concat [ "C", fs, DT.singleton separator, fs, fileCSV ]
+enSerialise (XMLSource fileXML) = DT.concat [ "X", fs, fileXML ]
+
+
+excludesFS :: DT.Text -> Bool
+excludesFS = not . DT.isInfixOf fs
+
+
+deSerialise :: DT.Text -> Maybe DataVariant
+deSerialise = deSerialise' . DT.splitOn fs
+
+
+deSerialise' :: [DT.Text] -> Maybe DataVariant
+deSerialise' [ "P", server, maybePort, database, maybeNamespace, table ] =
+		Just $ Postgres
+			server
+			(maybeIntValue maybePort)
+			database
+			(if DT.null maybeNamespace then Just maybeNamespace else Nothing)
+			table
+deSerialise' [ "Q", tableName ]  = Just $ Sqlite3 tableName
+deSerialise' [ "C", separator, fileCSV ] =
+		if DT.length separator == 1 then
+			Just $ CSV (DT.head separator) fileCSV
+		else
+			Nothing
+deSerialise' [ "X", fileXML ]  = Just $ XMLSource fileXML
+deSerialise' _ = Nothing

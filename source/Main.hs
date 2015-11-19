@@ -16,7 +16,7 @@ module Main (main) where
 
 import qualified Yesod as Y (warp)
 import qualified Authorisation (upgradeDB)
-import qualified DataSource (upgradeDB)
+import qualified Persistency (upgradeDB)
 import qualified Configure (siteObject, portTCP)
 import qualified CommandArgs (args)
 import qualified Foundation (JRState(..))
@@ -34,5 +34,5 @@ main = CommandArgs.args >>= Configure.siteObject >>= letsGo
 
 letsGo :: Foundation.JRState -> IO ()
 letsGo site = Authorisation.upgradeDB (Foundation.tablesFile site)
-	>> DataSource.upgradeDB (Foundation.tablesFile site)
+	>> Persistency.upgradeDB (Foundation.tablesFile site)
 	>> Y.warp (Configure.portTCP site) site

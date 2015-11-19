@@ -8,12 +8,15 @@ Portability: undefined
 -}
 
 
+{-# LANGUAGE OverloadedStrings #-}
+
+
 module ReviewPage (review) where
 
 
 import qualified Yesod.Core as YC
 import qualified Foundation
-import qualified Data.Text as DT (Text, pack, unpack, singleton, append)
+import qualified Data.Text as DT (Text, unpack, singleton, concat)
 import qualified Text.XML as XML
 import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
@@ -26,9 +29,13 @@ import qualified Data.Maybe as DMy (fromMaybe)
 
 -- | show next item for review, for the logged-in user
 review :: DT.Text -> Foundation.Handler YC.Html
-review username = YC.getYesod >>= pong where
-	pong base = (YC.liftIO $ XML.readFile XML.def (DT.unpack $ Foundation.userDir base `DT.append` contentName)) >>= digest . ConfigParse.content contentName (Foundation.debugging base) where
-	contentName = username `DT.append` (DT.pack ".cfg")
+review username = YC.getYesod >>= pong username
+
+
+pong :: DT.Text -> Foundation.JRState -> Foundation.Handler YC.Html
+pong username base = userConfiguration >>= digest . ConfigParse.content contentName (Foundation.debugging base) where
+	userConfiguration = YC.liftIO $ XML.readFile XML.def (DT.unpack contentName)
+	contentName = DT.concat [Foundation.userDir base, username, ".cfg"]
 
 
 digest :: ConfigParse.SchemaParsing -> Foundation.Handler YC.Html
@@ -47,8 +54,8 @@ mashAround [] = XML.Document standardPrologue (embed []) []
 standardPrologue :: XML.Prologue
 standardPrologue =
 	XML.Prologue
-		[XML.MiscInstruction (XML.Instruction (DT.pack "xml") (DT.pack "version=\"1.0\" encoding=\"UTF-8\""))]
-		(Just (XML.Doctype (DT.pack "html") Nothing))
+		[XML.MiscInstruction (XML.Instruction "xml" "version=\"1.0\" encoding=\"UTF-8\"")]
+		(Just (XML.Doctype "html" Nothing))
 		[]
 
 
@@ -63,7 +70,7 @@ embed content =
 				[makeAttribute "http-equiv" "Content-Type",
 					makeAttribute "content" "application/xhtml+xml;charset=utf-8"]
 				[],
-			makeNode "title" [] [XML.NodeContent $ DT.pack "Greek / Grammar-"],
+			makeNode "title" [] [XML.NodeContent "Greek / Grammar-"],
 			makeNode "style" [] [XML.NodeContent ceeSS]
 			],
 		makeNode "body"
@@ -95,42 +102,42 @@ oneSpace :: XML.Node
 oneSpace = XML.NodeContent $ DT.singleton ' '
 
 
-nameXML :: String -> XML.Name
-nameXML string = XML.Name (DT.pack string) Nothing Nothing
+nameXML :: DT.Text -> XML.Name
+nameXML tag = XML.Name tag Nothing Nothing
 
 
 postAttr :: [(XML.Name, DT.Text)]
 postAttr = [makeAttribute "method" "post"]
 
 
-alignAttr :: [Char] -> [(XML.Name, DT.Text)]
-alignAttr string = [makeAttribute "style" ("text-align:" ++ string ++ ";")]
+alignAttr :: DT.Text -> [(XML.Name, DT.Text)]
+alignAttr alignment = [makeAttribute "style" (DT.concat ["text-align:", alignment, ";"])]
 
 
-button1 :: String -> XML.Node
+button1 :: DT.Text -> XML.Node
 button1 name = button name name
 
 
-makeAttribute :: String -> String -> (XML.Name, DT.Text)
-makeAttribute attr value = (nameXML attr, DT.pack value)
+makeAttribute :: DT.Text -> DT.Text -> (XML.Name, DT.Text)
+makeAttribute attr value = (nameXML attr, value)
 
 
-makeNode :: String -> [(XML.Name, DT.Text)] -> [XML.Node] -> XML.Node
+makeNode :: DT.Text -> [(XML.Name, DT.Text)] -> [XML.Node] -> XML.Node
 makeNode name attrs subs = XML.NodeElement $ XML.Element (nameXML name) (DM.fromList attrs) subs
 
 
-button :: String -> String -> XML.Node
+button :: DT.Text -> DT.Text -> XML.Node
 button name value = makeNode "input" [makeAttribute "type" "submit",
 					makeAttribute "name" name,
 					makeAttribute "value" value] []
 
 
 gradeButton :: Char -> XML.Node
-gradeButton digit = button "grade" [digit]
+gradeButton digit = button "grade" (DT.singleton digit)
 
 
 ceeSS :: DT.Text
-ceeSS = DT.pack ".all {\n\
+ceeSS = ".all {\n\
      \font-family: Code2000;\n\
      \font-size: 24pt;\n\
      \background-color: #00ff80;\n\
