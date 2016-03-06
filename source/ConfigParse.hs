@@ -20,14 +20,14 @@ debugging option is passed in.
 module ConfigParse (UserSchema(..), SchemaParsing, View(..), Logged(..), content) where
 
 
-import qualified Data.Text as DT (Text, concat, append, singleton, all)
+import qualified Data.Text as DT (Text, concat, append, singleton, all, length)
 import qualified Data.Text.Read as DTR (decimal)
 import qualified Data.List as DL (intersperse)
 import qualified Text.XML as XML
 import qualified Data.Map as DM
 import qualified Data.Maybe as DMy
 import qualified Data.Char as DC (isSpace)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>))
 import qualified DataSource
 
 
@@ -246,7 +246,10 @@ dataSourceVariant context "SQLite3" attrs =
 	(\[ fileName ] -> DataSource.Sqlite3 fileName) <$> attrList context attrs [ "filename" ]
 
 dataSourceVariant context "CSV" attrs =
-	(\[ separator, file ] -> DataSource.CSV '\t' file) <$> attrList context attrs [ "separator", "file" ]
+	attrList context attrs [ "separator", "file" ] >>= seeEssVee where
+	seeEssVee [ separator, file ]
+		| DT.length separator == 1 = Right $ DataSource.CSV '\t' file
+		| otherwise = failToParse context [ "CSV separator \"", separator, "\" must be one character" ]
 
 dataSourceVariant context "XML" attrs =
 	(\[ file ] -> DataSource.XMLSource file) <$> attrList context attrs [ "file" ]
@@ -257,7 +260,6 @@ dataSourceVariant context form _ = failToParse context ["Invalid form \"", form,
 -- | given a list of attributes, and a list of attribute names, return either:
 -- | * @Left "missing attribute"@
 -- | * @Right $ list of attribute values@
-
 attrList :: XMLFileContext -> Attributes -> [DT.Text] -> Either DT.Text [DT.Text]
 
 attrList _ _ [] = Right []

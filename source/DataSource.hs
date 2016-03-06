@@ -19,7 +19,7 @@ module DataSource (DataSource(..), DataVariant(..)) where
 import TextShow (showt)
 import qualified Data.Text as DT (splitOn, Text, singleton, concat, empty, null, isInfixOf, head, length)
 import qualified Data.Text.Read as DTR (decimal)
-
+import Data.List (intersperse)
 
 data DataSource = DataSource DT.Text DT.Text DataVariant
 
@@ -54,12 +54,14 @@ reduceIt (Right (n, "")) = Just n
 reduceIt _ = Nothing
 
 
+flatten :: [DT.Text] -> DT.Text
+flatten = DT.concat . intersperse fs
 
 enSerialise :: DataVariant -> DT.Text
-enSerialise (Postgres server port database namespace table) = DT.concat [ "P", fs, server, fs, showMI port, fs, database, fs, showMT namespace, fs, table ]
-enSerialise (Sqlite3 tableName) = DT.concat [ "Q", fs, tableName ]
-enSerialise (CSV separator fileCSV) = DT.concat [ "C", fs, DT.singleton separator, fs, fileCSV ]
-enSerialise (XMLSource fileXML) = DT.concat [ "X", fs, fileXML ]
+enSerialise (Postgres serverIP portNo dbase nameSpace dtable) = flatten [ "P", serverIP, showMI portNo, dbase, showMT nameSpace, dtable ]
+enSerialise (Sqlite3 dtableName) = flatten [ "Q", dtableName ]
+enSerialise (CSV recseparator ffileCSV) = flatten [ "C", DT.singleton recseparator, ffileCSV ]
+enSerialise (XMLSource ffileXML) = flatten [ "X", ffileXML ]
 
 
 excludesFS :: DT.Text -> Bool
@@ -71,18 +73,18 @@ deSerialise = deSerialise' . DT.splitOn fs
 
 
 deSerialise' :: [DT.Text] -> Maybe DataVariant
-deSerialise' [ "P", server, maybePort, database, maybeNamespace, table ] =
+deSerialise' [ "P", serverIP, maybePort, dbase, maybeNamespace, dtable ] =
 		Just $ Postgres
-			server
+			serverIP
 			(maybeIntValue maybePort)
-			database
+			dbase
 			(if DT.null maybeNamespace then Just maybeNamespace else Nothing)
-			table
-deSerialise' [ "Q", tableName ]  = Just $ Sqlite3 tableName
-deSerialise' [ "C", separator, fileCSV ] =
-		if DT.length separator == 1 then
-			Just $ CSV (DT.head separator) fileCSV
+			dtable
+deSerialise' [ "Q", dtableName ]  = Just $ Sqlite3 dtableName
+deSerialise' [ "C", recseparator, ffileCSV ] =
+		if DT.length recseparator == 1 then
+			Just $ CSV (DT.head recseparator) ffileCSV
 		else
 			Nothing
-deSerialise' [ "X", fileXML ]  = Just $ XMLSource fileXML
+deSerialise' [ "X", ffileXML ]  = Just $ XMLSource ffileXML
 deSerialise' _ = Nothing

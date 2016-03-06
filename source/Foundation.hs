@@ -27,9 +27,9 @@ import qualified Yesod.Auth.Account as YAA
 import qualified Authorisation (User, SqlBackend, persistAction)
 import qualified RouteData
 import qualified EmailVerification
-import Data.Text (Text)
 import qualified Data.Text as DT (concat)
 import qualified AuthoriStyle (Style)
+import Data.Text (Text)
 
 
 -- | The foundation object

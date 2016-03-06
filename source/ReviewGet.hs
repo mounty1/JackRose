@@ -1,6 +1,6 @@
 {-|
 Description: Return content of next review item
-Copyright: (c) Michael Mounteney, 2015
+Copyright: (c) Michael Mounteney, 2016
 License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
 Stability: experimental
@@ -11,7 +11,7 @@ Portability: undefined
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module ReviewPage (review) where
+module ReviewGet (getHomeR) where
 
 
 import qualified Yesod.Core as YC
@@ -25,6 +25,12 @@ import qualified ConfigParse (content, UserSchema(..), Logged(..), SchemaParsing
 import qualified FailureMessage (page)
 import qualified Logging
 import qualified Data.Maybe as DMy (fromMaybe)
+import LoginPlease (onlyIfAuthorised)
+
+
+-- | verify that a user be logged-in, and if s/he be, present the next item for review.
+getHomeR :: Foundation.Handler YC.Html
+getHomeR = onlyIfAuthorised review
 
 
 -- | show next item for review, for the logged-in user
@@ -83,7 +89,7 @@ embed content =
 					[]
 					[makeNode "td"
 						(alignAttr "left")
-						[makeNode "form" postAttr [button1 "load"]],
+						[makeNode "form" postAttr [button1 "stats"]],
 					makeNode "td"
 						(alignAttr "center")
 						[makeNode "form"

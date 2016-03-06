@@ -2,11 +2,11 @@
 
 The phases required are:
 
-1. Downloading and installing the building software;  mainly ghc and some
+- Downloading and installing the building software;  mainly ghc and some
    platform-specific tools.
-2. Downloading and building JackRose itself.
-3. Running JackRose.
-4. Connecting to JackRose from a web browser.
+- Downloading and building JackRose itself.
+- Running JackRose.
+- Connecting to JackRose from a web browser.
 
 
 # THE DETAIL
@@ -40,12 +40,12 @@ Although I've not tried it, I assume the Haskell platform at
 https://www.haskell.org/platform/ is the way to go here.
 
 
-## Downloading and building JackRose itself.
+## Downloading and building JackRose itself
 
-$ git clone https://github.com/mounty1/JackRose.git
-$ cd JackRose/source
-$ cabal update
-$ cabal install --builddir=gentoo
+    $ git clone https://github.com/mounty1/JackRose.git
+    $ cd JackRose/source
+    $ cabal update
+    $ cabal install --builddir=gentoo
 
 Then cabal install the missing/required packages.
 The idea of that builddir option is that if you are building from the same tree
@@ -53,24 +53,27 @@ on Centos 7 then Halcyon uses the default dist/ directory which should be
 entirely separate from the build on other platforms.
 
 
-## Running JackRose.
+## Running JackRose
 
-$ cd JackRose/sandbox
-Modify jackrose.conf to taste.
-$ mv mounty.cfg {yourloginname}.cfg
+    $ cd JackRose/sandbox
+    Modify jackrose.conf to taste.
+    $ mv default.cfg {yourloginname}.cfg
+
 When you connect to JackRose, you will have to set up an account.
 Currently, the only way of configuring your account is to have a server-side
 configuration file of the same name as your login.
 You are doing this step before you have logged-in;  i.e., before you have
 actually created the account.
+
 Modify {yourloginname}.cfg to taste.
 
-Finally, run JackRose
-Centos7# cd JackRose/sandbox ; /app/bin/JackRose -c ./jackrose.conf
-Gentoo$  cd JackRose/sandbox ; ../source/gentoo/dist/JackRose/JackRose -c ./jackrose.conf
+Finally, run JackRose:
+
+    Centos7# cd JackRose/sandbox ; /app/bin/JackRose -c ./jackrose.conf
+    Gentoo$  cd JackRose/sandbox ; ../source/gentoo/dist/JackRose/JackRose -c ./jackrose.conf
 
 
-## Connecting to JackRose from a web browser.
+## Connecting to JackRose from a web browser
 
 In the simple case, open your browser and navigate to http://localhost:3000
 

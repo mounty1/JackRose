@@ -35,7 +35,15 @@
 
 - One-to-many cards.
 
-- Debug/info. Mode checks attributes: [optional missing] [optional present] [unknown-present]
+- Debug/info. Mode checks attributes: [optional missing] [optional present] [unknown-present].
+
+- Security Model. Configurable, hierarchical write rights to data.
+
+- Partial card ordering, to impose learning of basic material before more derived or advanced
+  material is presented, as [Anki](https://ankiweb.net/shared/info/699486759).
+
+- Security:  whitelist of tags with whitelist of attributes to pass.  Greylist of tags to elide.  Get the
+  whitelist [here][https://github.com/peerlibrary/peerlibrary/issues/558)
 
 
 # CODING AND LAYOUT STANDARDS
