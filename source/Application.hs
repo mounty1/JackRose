@@ -27,6 +27,7 @@ import ReviewGet (getHomeR)
 import ReviewPost (postHomeR)
 import LoginPost (getLoginR)
 import Foundation
+import JRState (JRState)
 
 
 Yesod.mkYesodDispatch "JRState" resourcesJRState

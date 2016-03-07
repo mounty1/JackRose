@@ -17,6 +17,7 @@ executable JackRose
                       smtp-mail,
                       ConfigFile,
                       mtl,
+                      stm,
                       transformers,
                       xml,
                       text-show,

@@ -13,7 +13,8 @@ module LoginPost (getLoginR) where
 
 import qualified Yesod.Auth as YA
 import qualified Yesod.Core as YC
-import qualified Foundation
+import qualified Foundation (Handler)
+import qualified JRState
 import Data.Text (Text)
 import qualified AuthoriStyle (Style(..))
 import GoHome (goHome)
@@ -24,8 +25,8 @@ getLoginR :: Text -> Foundation.Handler YC.Html
 getLoginR acctName = YC.getYesod >>= setAcctIfTrusted acctName
 
 
-setAcctIfTrusted :: Text -> Foundation.JRState -> Foundation.Handler YC.Html
-setAcctIfTrusted acctName site = setAcctIfTrusted' acctName (Foundation.howAuthorised site)
+setAcctIfTrusted :: Text -> JRState.JRState -> Foundation.Handler YC.Html
+setAcctIfTrusted acctName site = setAcctIfTrusted' acctName (JRState.howAuthorised site)
 
 
 setAcctIfTrusted' :: Text -> AuthoriStyle.Style -> Foundation.Handler YC.Html

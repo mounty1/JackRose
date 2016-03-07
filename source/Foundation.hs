@@ -28,26 +28,8 @@ import qualified Authorisation (User, SqlBackend, persistAction)
 import qualified RouteData
 import qualified EmailVerification
 import qualified Data.Text as DT (concat)
-import qualified AuthoriStyle (Style)
 import Data.Text (Text)
-
-
--- | The foundation object
-data JRState = JRState {
-		secureOnly :: Bool,  -- ^ restrict connections to HTTPS
-		sessionTimeout :: Int,  -- ^ in minutes
-		portNumber :: Maybe Int,    -- ^ useful to override for non-privileged testing
-		tablesFile :: Text,
-			-- ^ name of file containing SQLite3 tables
-		userTemplate :: Text,
-			-- starting template;  copied when a new user account be set up.
-		userDir :: Text,
-			-- directory containing user configurations.
-		keysFile :: FilePath,  -- ^ AES keys
-		appRoot :: Text, -- ^ needed for identification emails
-		debugging :: Bool,   -- ^ output more information
-		howAuthorised :: AuthoriStyle.Style
-	}
+import JRState (JRState(..))
 
 
 YC.mkYesodData "JRState" RouteData.routeData

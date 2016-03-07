@@ -20,34 +20,36 @@ import qualified Data.ConfigFile as DC
 import qualified Control.Monad.Except as CME
 import qualified Data.List as DL (lookup)
 import qualified Data.Maybe as DM
-import qualified Foundation (JRState(..))
 import qualified AuthoriStyle (Style(..))
+import qualified JRState (JRState(..))
+import qualified Data.Map as DM (empty)
+import Control.Concurrent.STM (newTVar)
 
 
-siteObject :: CommandArgs.CmdLineArgs -> IO Foundation.JRState
-siteObject argsMap = configToSite configFileName baseSiteObject{Foundation.debugging = CommandArgs.debuggery argsMap} where
+siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
+siteObject argsMap = configToSite configFileName baseSiteObject{JRState.debugging = CommandArgs.debuggery argsMap} where
 	configFileName = DM.fromMaybe defaultConfigFileName (CommandArgs.configName argsMap)
 
 
-configToSite :: String -> Foundation.JRState -> IO Foundation.JRState
+configToSite :: String -> JRState.JRState -> IO JRState.JRState
 configToSite configName site = (CME.runExceptT $ pipe configName site) >>= estate
 
 
-portTCP :: Foundation.JRState -> Int
-portTCP site = DM.fromMaybe (if Foundation.secureOnly site then 443 else 80) (Foundation.portNumber site)
+portTCP :: JRState.JRState -> Int
+portTCP site = DM.fromMaybe (if JRState.secureOnly site then 443 else 80) (JRState.portNumber site)
 
 
-estate :: Show t => Either t Foundation.JRState -> IO Foundation.JRState
+estate :: Show t => Either t JRState.JRState -> IO JRState.JRState
 estate (Right state) = return state
 estate (Left err) = (putStrLn $ "<<" ++ show err ++ ">>") >> return baseSiteObject
 
 
-pipe :: (CME.MonadError DC.CPError m, CME.MonadIO m) => FilePath -> Foundation.JRState -> m Foundation.JRState
+pipe :: (CME.MonadError DC.CPError m, CME.MonadIO m) => FilePath -> JRState.JRState -> m JRState.JRState
 pipe configName site =
 	(CME.join $ CME.liftIO $ DC.readfile DC.emptyCP{DC.optionxform=id} configName) >>= foldInCfg site
 
 
-foldInCfg :: Monad m => Foundation.JRState -> DC.ConfigParser -> m Foundation.JRState
+foldInCfg :: Monad m => JRState.JRState -> DC.ConfigParser -> m JRState.JRState
 foldInCfg site configuration =
 	return $ foldl mergeIn site seckeys where
 		mergeIn ss0 key = splice ss0 (DL.lookup key siteAlterMap) where
@@ -59,7 +61,7 @@ foldInCfg site configuration =
 		(Right seckeys) = DC.options configuration defaultSection
 
 
-type SiteAlterFn a = Foundation.JRState -> a -> Foundation.JRState
+type SiteAlterFn a = JRState.JRState -> a -> JRState.JRState
 
 
 data SiteAlterVector = AB (SiteAlterFn Bool)
@@ -69,15 +71,15 @@ data SiteAlterVector = AB (SiteAlterFn Bool)
 
 siteAlterMap :: [(DC.OptionSpec, SiteAlterVector)]
 siteAlterMap = [
-	("secureSession", AB (\site t -> site{Foundation.secureOnly = t})),
-	("sessionMinutes", AI (\site t -> site{Foundation.sessionTimeout = t})),
-	("portNumber", AI (\site t -> site{Foundation.portNumber = Just t})),
-	("tablesFile", AS (\site t -> site{Foundation.tablesFile = DT.pack t})),
-	("userTemplate", AS (\site t -> site{Foundation.userTemplate = DT.pack t})),
-	("userDir", AS (\site t -> site{Foundation.userDir = DT.pack t})),  -- ^ TODO check it has a final /
-	("appRoot", AS (\site t -> site{Foundation.appRoot = DT.pack t})),
-	("trustedSite", AB (\site t -> if t then site{Foundation.howAuthorised = AuthoriStyle.Trust} else site)),
-	("keysFile", AS (\site t -> site{Foundation.keysFile = t}))
+	("secureSession", AB (\site t -> site{JRState.secureOnly = t})),
+	("sessionMinutes", AI (\site t -> site{JRState.sessionTimeout = t})),
+	("portNumber", AI (\site t -> site{JRState.portNumber = Just t})),
+	("tablesFile", AS (\site t -> site{JRState.tablesFile = DT.pack t})),
+	("userTemplate", AS (\site t -> site{JRState.userTemplate = DT.pack t})),
+	("userDir", AS (\site t -> site{JRState.userDir = DT.pack t})),  -- ^ TODO check it has a final /
+	("appRoot", AS (\site t -> site{JRState.appRoot = DT.pack t})),
+	("trustedSite", AB (\site t -> if t then site{JRState.howAuthorised = AuthoriStyle.Trust} else site)),
+	("keysFile", AS (\site t -> site{JRState.keysFile = t}))
 	]
 
 
@@ -85,8 +87,8 @@ defaultSection :: String
 defaultSection  = "DEFAULT"
 
 
-baseSiteObject :: Foundation.JRState
-baseSiteObject = Foundation.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty False AuthoriStyle.Email
+baseSiteObject :: JRState.JRState
+baseSiteObject = JRState.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty False AuthoriStyle.Email (newTVar DM.empty)
 
 
 defaultConfigFileName :: String

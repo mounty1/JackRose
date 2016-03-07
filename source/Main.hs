@@ -19,7 +19,7 @@ import qualified Authorisation (upgradeDB)
 import qualified Persistency (upgradeDB)
 import qualified Configure (siteObject, portTCP)
 import qualified CommandArgs (args)
-import qualified Foundation (JRState(..))
+import qualified JRState (JRState(..))
 import qualified Application () -- just to get the instance and the dispatcher
 
 
@@ -32,7 +32,7 @@ main :: IO ()
 main = CommandArgs.args >>= Configure.siteObject >>= letsGo
 
 
-letsGo :: Foundation.JRState -> IO ()
-letsGo site = Authorisation.upgradeDB (Foundation.tablesFile site)
-	>> Persistency.upgradeDB (Foundation.tablesFile site)
+letsGo :: JRState.JRState -> IO ()
+letsGo site = Authorisation.upgradeDB (JRState.tablesFile site)
+	>> Persistency.upgradeDB (JRState.tablesFile site)
 	>> Y.warp (Configure.portTCP site) site

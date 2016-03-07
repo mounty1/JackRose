@@ -15,11 +15,12 @@ import qualified Yesod.Auth as YA
 import qualified Yesod.Core as YC
 import qualified Foundation
 import Data.Text (Text)
+import qualified JRState (JRState)
 
 
 onlyIfAuthorised :: (Text -> Foundation.Handler YC.Html) -> Foundation.Handler YC.Html
 onlyIfAuthorised action = YA.maybeAuthId >>= maybe loginPlease action
 
 
-loginPlease :: YC.HandlerT Foundation.JRState IO a
+loginPlease :: YC.HandlerT JRState.JRState IO a
 loginPlease = YC.redirect (Foundation.AuthR YA.LoginR)

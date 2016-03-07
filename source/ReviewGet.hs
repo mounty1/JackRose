@@ -15,7 +15,7 @@ module ReviewGet (getHomeR) where
 
 
 import qualified Yesod.Core as YC
-import qualified Foundation
+import qualified Foundation (Handler)
 import qualified Data.Text as DT (Text, unpack, singleton, concat)
 import qualified Text.XML as XML
 import qualified Text.Blaze.Html as BZH (toHtml)
@@ -25,6 +25,7 @@ import qualified ConfigParse (content, UserSchema(..), Logged(..), SchemaParsing
 import qualified FailureMessage (page)
 import qualified Logging
 import qualified Data.Maybe as DMy (fromMaybe)
+import qualified JRState (JRState(..))
 import LoginPlease (onlyIfAuthorised)
 
 
@@ -38,10 +39,10 @@ review :: DT.Text -> Foundation.Handler YC.Html
 review username = YC.getYesod >>= pong username
 
 
-pong :: DT.Text -> Foundation.JRState -> Foundation.Handler YC.Html
-pong username base = userConfiguration >>= digest . ConfigParse.content contentName (Foundation.debugging base) where
+pong :: DT.Text -> JRState.JRState -> Foundation.Handler YC.Html
+pong username base = userConfiguration >>= digest . ConfigParse.content contentName (JRState.debugging base) where
 	userConfiguration = YC.liftIO $ XML.readFile XML.def (DT.unpack contentName)
-	contentName = DT.concat [Foundation.userDir base, username, ".cfg"]
+	contentName = DT.concat [JRState.userDir base, username, ".cfg"]
 
 
 digest :: ConfigParse.SchemaParsing -> Foundation.Handler YC.Html
