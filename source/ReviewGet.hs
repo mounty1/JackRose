@@ -16,17 +16,16 @@ module ReviewGet (getHomeR) where
 
 import qualified Yesod.Core as YC
 import qualified Foundation (Handler)
-import qualified Data.Text as DT (Text, unpack, singleton, concat)
+import qualified Data.Text as DT (Text, singleton, concat)
 import qualified Text.XML as XML
 import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse)
-import qualified ConfigParse (content, UserSchema(..), Logged(..), SchemaParsing, View(..))
-import qualified FailureMessage (page)
-import qualified Logging
-import qualified Data.Maybe as DMy (fromMaybe)
-import qualified JRState (JRState(..))
 import LoginPlease (onlyIfAuthorised)
+import qualified JRState (JRState(..))
+import qualified ConfigParse (UserSchema(..), View(..))
+import Control.Monad.STM (atomically)
+import Control.Concurrent.STM.TVar (readTVar)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -40,17 +39,10 @@ review username = YC.getYesod >>= pong username
 
 
 pong :: DT.Text -> JRState.JRState -> Foundation.Handler YC.Html
-pong username base = userConfiguration >>= digest . ConfigParse.content contentName (JRState.debugging base) where
-	userConfiguration = YC.liftIO $ XML.readFile XML.def (DT.unpack contentName)
-	contentName = DT.concat [JRState.userDir base, username, ".cfg"]
-
-
-digest :: ConfigParse.SchemaParsing -> Foundation.Handler YC.Html
-
-digest (Left failReason) = FailureMessage.page failReason
-
-digest (Right (ConfigParse.Logged warnings info (ConfigParse.UserSchema _ views))) =
-	mapM_ Logging.logWarn warnings >> mapM_ Logging.logInfo (DMy.fromMaybe [] info) >> (return $ BZH.toHtml $ mashAround views)
+pong username site =
+	YC.liftIO (JRState.userConfig site)
+		>>= YC.liftIO . atomically . readTVar
+		>>= return . BZH.toHtml . mashAround . maybe [] ConfigParse.views . DM.lookup username
 
 
 mashAround :: [ConfigParse.View] -> XML.Document

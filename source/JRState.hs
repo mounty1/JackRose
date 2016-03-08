@@ -15,7 +15,6 @@ import qualified AuthoriStyle (Style)
 import Data.Text (Text)
 import ConfigParse (UserSchema)
 import Data.Map (Map)
-import Control.Monad.STM (STM)
 import Control.Concurrent.STM (TVar)
 
 
@@ -41,5 +40,5 @@ data JRState = JRState {
 			-- ^ output more information
 		howAuthorised :: AuthoriStyle.Style,
 			-- ^ not sure and makes no sense now
-		userConfig :: STM (TVar (Map Text UserSchema))
+		userConfig :: IO (TVar (Map Text UserSchema))
 	}

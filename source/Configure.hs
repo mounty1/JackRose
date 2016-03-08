@@ -24,6 +24,7 @@ import qualified AuthoriStyle (Style(..))
 import qualified JRState (JRState(..))
 import qualified Data.Map as DM (empty)
 import Control.Concurrent.STM (newTVar)
+import Control.Monad.STM (atomically)
 
 
 siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
@@ -88,7 +89,7 @@ defaultSection  = "DEFAULT"
 
 
 baseSiteObject :: JRState.JRState
-baseSiteObject = JRState.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty False AuthoriStyle.Email (newTVar DM.empty)
+baseSiteObject = JRState.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty False AuthoriStyle.Email (atomically $ newTVar DM.empty)
 
 
 defaultConfigFileName :: String
