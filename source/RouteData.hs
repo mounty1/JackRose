@@ -1,5 +1,5 @@
 {-|
-Description: TH argument;  isolated to contain the scope of LANGUAGE extensions.
+Description: Route table;  isolated to contain the scope of LANGUAGE extensions.
 Copyright: (c) Michael Mounteney, 2015
 License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
@@ -24,5 +24,6 @@ routeData :: [YT.ResourceTree String]
 routeData = [YC.parseRoutes|
 	/ HomeR GET POST
 	/auth AuthR YA.Auth YA.getAuth
+	/post LoginPostR GET
 	/account/#Text LoginR GET
 	|]

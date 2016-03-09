@@ -24,8 +24,7 @@ import qualified Data.List as DL (intersperse)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (JRState(..))
 import qualified ConfigParse (UserSchema(..), View(..))
-import Control.Monad.STM (atomically)
-import Control.Concurrent.STM.TVar (readTVar)
+import Control.Concurrent.STM.TVar (readTVarIO)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -35,19 +34,23 @@ getHomeR = onlyIfAuthorised review
 
 -- | show next item for review, for the logged-in user
 review :: DT.Text -> Foundation.Handler YC.Html
-review username = YC.getYesod >>= pong username
+review username = YC.getYesod
+		>>= YC.liftIO . JRState.userConfig
+		>>= YC.liftIO . readTVarIO
+		>>= return . BZH.toHtml . maybe (errorNoUser username) (mashAround . ConfigParse.views) . DM.lookup username
 
 
-pong :: DT.Text -> JRState.JRState -> Foundation.Handler YC.Html
-pong username site =
-	YC.liftIO (JRState.userConfig site)
-		>>= YC.liftIO . atomically . readTVar
-		>>= return . BZH.toHtml . mashAround . maybe [] ConfigParse.views . DM.lookup username
+errorNoUser :: DT.Text -> XML.Document
+errorNoUser username = mashAround' [XML.NodeContent $ DT.concat ["user \"", username, "\" dropped from state"]]
 
 
 mashAround :: [ConfigParse.View] -> XML.Document
-mashAround (ConfigParse.View _ _ obverse _ : _) = XML.Document standardPrologue (embed obverse) []
-mashAround [] = XML.Document standardPrologue (embed []) []
+mashAround (ConfigParse.View _ _ obverse _ : _) = mashAround' obverse
+mashAround [] = mashAround' []
+
+
+mashAround' :: [XML.Node] -> XML.Document
+mashAround' face = XML.Document standardPrologue (embed face) []
 
 
 standardPrologue :: XML.Prologue

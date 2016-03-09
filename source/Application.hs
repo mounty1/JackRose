@@ -25,7 +25,7 @@ import qualified Yesod
 import qualified Yesod.Auth as YA
 import ReviewGet (getHomeR)
 import ReviewPost (postHomeR)
-import LoginPost (getLoginR)
+import LoginPost (getLoginR, getLoginPostR)
 import Foundation
 import JRState (JRState)
 

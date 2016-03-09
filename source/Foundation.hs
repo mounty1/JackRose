@@ -16,6 +16,8 @@ without @qualified@.
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, ViewPatterns #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 
 module Foundation where
 
@@ -38,7 +40,7 @@ YC.mkYesodData "JRState" RouteData.routeData
 instance YA.YesodAuth JRState where
 	type AuthId JRState = YAA.Username
 	getAuthId = return . Just . YA.credsIdent
-	loginDest _ = HomeR
+	loginDest _ = LoginPostR
 	logoutDest _ = AuthR YA.LoginR
 	authPlugins _ = [YAA.accountPlugin]
 	authHttpManager _ = error "No manager needed"
