@@ -48,6 +48,5 @@ digest :: DT.Text -> JRState.JRState -> ConfigParse.Logged ConfigParse.UserSchem
 digest acctName site (ConfigParse.Logged warnings info userSchema) =
 	mapM_ Logging.logWarn warnings
 		>> mapM_ Logging.logInfo (DMy.fromMaybe [] info)
-		>> (YC.liftIO $ JRState.userConfig site)
-		>>= return . atomically . flip modifyTVar' (DM.insert acctName userSchema)
+		>> (YC.liftIO $ atomically $ modifyTVar' (JRState.userConfig site) (DM.insert acctName userSchema))
 		>> getHomeR

@@ -21,28 +21,28 @@ import qualified Control.Monad.Except as CME
 import qualified Data.List as DL (lookup)
 import qualified Data.Maybe as DM
 import qualified AuthoriStyle (Style(..))
-import qualified JRState (JRState(..))
+import qualified JRState (JRState(..), UserConfig)
 import qualified Data.Map as DM (empty)
 import Control.Concurrent.STM (newTVar)
 import Control.Monad.STM (atomically)
 
 
 siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
-siteObject argsMap = configToSite configFileName baseSiteObject{JRState.debugging = CommandArgs.debuggery argsMap} where
+siteObject argsMap = (atomically $ newTVar DM.empty) >>= newConfiguration where
+	newConfiguration confMap = configToSite configFileName (baseSiteObject confMap) {JRState.debugging = CommandArgs.debuggery argsMap}
 	configFileName = DM.fromMaybe defaultConfigFileName (CommandArgs.configName argsMap)
 
 
 configToSite :: String -> JRState.JRState -> IO JRState.JRState
-configToSite configName site = (CME.runExceptT $ pipe configName site) >>= estate
+configToSite configName site = (CME.runExceptT $ pipe configName site) >>= either (estate site) return
 
 
 portTCP :: JRState.JRState -> Int
 portTCP site = DM.fromMaybe (if JRState.secureOnly site then 443 else 80) (JRState.portNumber site)
 
 
-estate :: Show t => Either t JRState.JRState -> IO JRState.JRState
-estate (Right state) = return state
-estate (Left err) = (putStrLn $ "<<" ++ show err ++ ">>") >> return baseSiteObject
+estate :: Show t => JRState.JRState -> t -> IO JRState.JRState
+estate site err = (putStrLn $ "<<" ++ show err ++ ">>") >> return site
 
 
 pipe :: (CME.MonadError DC.CPError m, CME.MonadIO m) => FilePath -> JRState.JRState -> m JRState.JRState
@@ -88,8 +88,8 @@ defaultSection :: String
 defaultSection  = "DEFAULT"
 
 
-baseSiteObject :: JRState.JRState
-baseSiteObject = JRState.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty False AuthoriStyle.Email (atomically $ newTVar DM.empty)
+baseSiteObject :: JRState.UserConfig -> JRState.JRState
+baseSiteObject conf = JRState.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty False AuthoriStyle.Email conf
 
 
 defaultConfigFileName :: String

@@ -35,8 +35,7 @@ getHomeR = onlyIfAuthorised review
 -- | show next item for review, for the logged-in user
 review :: DT.Text -> Foundation.Handler YC.Html
 review username = YC.getYesod
-		>>= YC.liftIO . JRState.userConfig
-		>>= YC.liftIO . readTVarIO
+		>>= YC.liftIO . readTVarIO . JRState.userConfig
 		>>= return . BZH.toHtml . maybe (errorNoUser username) (mashAround . ConfigParse.views) . DM.lookup username
 
 

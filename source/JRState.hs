@@ -18,6 +18,9 @@ import Data.Map (Map)
 import Control.Concurrent.STM (TVar)
 
 
+type UserConfig = TVar (Map Text UserSchema)
+
+
 -- | The foundation object
 data JRState = JRState {
 		secureOnly :: Bool,
@@ -40,5 +43,5 @@ data JRState = JRState {
 			-- ^ output more information
 		howAuthorised :: AuthoriStyle.Style,
 			-- ^ not sure and makes no sense now
-		userConfig :: IO (TVar (Map Text UserSchema))
+		userConfig :: UserConfig
 	}
