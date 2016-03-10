@@ -29,7 +29,7 @@ import Control.Monad.STM (atomically)
 
 siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
 siteObject argsMap = (atomically $ newTVar DM.empty) >>= newConfiguration where
-	newConfiguration confMap = configToSite configFileName (baseSiteObject confMap) {JRState.debugging = CommandArgs.debuggery argsMap}
+	newConfiguration confMap = configToSite configFileName (JRState.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty (CommandArgs.debuggery argsMap) AuthoriStyle.Email confMap)
 	configFileName = DM.fromMaybe defaultConfigFileName (CommandArgs.configName argsMap)
 
 
@@ -86,10 +86,6 @@ siteAlterMap = [
 
 defaultSection :: String
 defaultSection  = "DEFAULT"
-
-
-baseSiteObject :: JRState.UserConfig -> JRState.JRState
-baseSiteObject conf = JRState.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty False AuthoriStyle.Email conf
 
 
 defaultConfigFileName :: String
