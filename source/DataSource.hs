@@ -21,6 +21,7 @@ import qualified Data.Text as DT (splitOn, Text, singleton, concat, empty, null,
 import qualified Data.Text.Read as DTR (decimal)
 import Data.List (intersperse)
 
+
 data DataSource = DataSource DT.Text DT.Text DataVariant
 
 
@@ -32,13 +33,11 @@ data DataVariant
 
 
 showMI :: Maybe Int -> DT.Text
-showMI Nothing = DT.empty
-showMI (Just n) = showt n
+showMI = maybe DT.empty showt
 
 
 showMT :: Maybe DT.Text -> DT.Text
-showMT Nothing = DT.empty
-showMT (Just text) = text
+showMT = maybe DT.empty id
 
 
 fs :: DT.Text
@@ -56,6 +55,7 @@ reduceIt _ = Nothing
 
 flatten :: [DT.Text] -> DT.Text
 flatten = DT.concat . intersperse fs
+
 
 enSerialise :: DataVariant -> DT.Text
 enSerialise (Postgres serverIP portNo dbase nameSpace dtable) = flatten [ "P", serverIP, showMI portNo, dbase, showMT nameSpace, dtable ]
