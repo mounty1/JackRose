@@ -23,7 +23,7 @@ epoch = DT.toSeconds $ DT.fromGregorian' 2015 1 1
 now :: IO Stamp
 now = DT.getCurrentTime >>= DT.toSeconds >>= return . reBase
 
--- | internally, to convert between 
+-- | internally, to convert between external and internal forms
 reBase :: Int -> Stamp
 reBase datetime = if datetime > epoch then Stamp $ datetime - epoch else error "Clock before epoch"
 

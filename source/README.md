@@ -45,6 +45,9 @@
 - Security:  whitelist of tags with whitelist of attributes to pass.  Greylist of tags to elide.  Get the
   whitelist [here][https://github.com/peerlibrary/peerlibrary/issues/558)
 
+- Security:  https://github.com/pillarjs/understanding-csrf
+https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29_Prevention_Cheat_Sheet
+
 
 # CODING AND LAYOUT STANDARDS
 

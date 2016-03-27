@@ -8,85 +8,101 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 
-module Configure (siteObject, portTCP) where
+module Configure (siteObject) where
 
 
-import qualified Data.Text as DT (pack, empty)
+import qualified Data.Text as DT (pack, empty, Text, unpack, concat)
+import Data.List ((\\))
 import qualified CommandArgs (CmdLineArgs(..))
 import qualified Data.ConfigFile as DC
-import qualified Control.Monad.Except as CME
-import qualified Data.List as DL (lookup)
-import qualified Data.Maybe as DM
+import qualified Data.Maybe as DMy
 import qualified AuthoriStyle (Style(..))
 import qualified JRState (JRState(..), UserConfig)
 import qualified Data.Map as DM (empty)
 import Control.Concurrent.STM (newTVar)
 import Control.Monad.STM (atomically)
+import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Logger (MonadLogger, monadLoggerLog, logInfoN, logWarnN, logErrorN)
+import Control.Monad.Error.Class (catchError)
+import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.Logger (runStderrLoggingT)
+import System.Log.FastLogger (toLogStr, fromLogStr)
+import Data.Text.IO (hPutStrLn)
+import System.IO (stderr)
+import Data.Text.Encoding (decodeUtf8)
 
 
 siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
-siteObject argsMap = (atomically $ newTVar DM.empty) >>= newConfiguration where
-	newConfiguration confMap = configToSite configFileName (JRState.JRState True 120 Nothing "jackrose.sqlite" "default.cfg" "users/" "jackrose.aes" DT.empty (CommandArgs.debuggery argsMap) AuthoriStyle.Email confMap)
-	configFileName = DM.fromMaybe defaultConfigFileName (CommandArgs.configName argsMap)
+siteObject argsMap = runStderrLoggingT $ liftIO $ ((atomically $ newTVar DM.empty) >>= configurationData) where
+
+	-- feed the user data STM object into the reading of the configuration file.
+	configurationData :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, m ~ IO) => JRState.UserConfig -> m JRState.JRState
+	configurationData sharedData =
+		-- if the configuration file name be specified, it must be readable, but the default file need not exist.
+		(if conFallback then flip catchError warnBadConfigFile else id) (DC.readfile initConfig configName) >>=
+			either (liftIO . return . error . errorInConfig) (assembleConf sharedData)
+	warnBadConfigFile err = logWarnN (DT.pack $ show err) >> (liftIO $ return $ Right initConfig)
+
+	-- feed the user data STM, the configuration file contents and now the database connection pool, into the creation of the site object.
+	assembleConf :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, m ~ IO) => JRState.UserConfig -> DC.ConfigParser -> m JRState.JRState
+	assembleConf sharedData configuration = connPoolM >>= makeAppObject where
+
+		-- accumulate up the fields of the site object, one by one.
+		-- the list of configuration key values is of course static, but subject to maintenance.
+		makeAppObject pool = spliceShared (almostAppObject pool) (DC.options configuration defaultSection)
+		almostAppObject pool =
+			extractConfItem authory AuthoriStyle.Email "trustedSite" $
+				extractConfItem id (CommandArgs.debuggery argsMap) "debug" $
+					extractConfTextItem DT.empty "appRoot" $
+						extractConfItem id "jackrose.aes" "keysFile" $
+							extractConfTextItem "users/" "userDir" $
+								extractConfTextItem "default.cfg" "userTemplate" $
+									extractConfItem Just Nothing "portNumber" $
+										extractConfNumItem 120 "sessionMinutes" $
+											extractConfItem id True "secureSession" $ (connLabels, JRState.JRState pool)
+		-- create the site object and return it, logging information, warnings and errors as required.
+		spliceShared (labels, fn) keysE = either munchErr munchKeys keysE >> (liftIO $ return $ site) where
+			munchErr = logErrorN . DT.pack . show
+			munchKeys keys = (if JRState.debugging site then (>>) (mapM_ (logInfoN . makeUnseenKeyMsg) (labels \\ keysInConfig)) else id) (mapM_ (logWarnN . makeUnknownKeyMsg) (keysInConfig \\ labels)) where
+				keysInConfig = map DT.pack keys
+			site = fn sharedData
+
+		-- poor man's Writer function;  extract a value from the configuration data and accumulate its key
+		extractConfItem :: DC.Get_C s => (s -> b) -> b -> DT.Text -> ([DT.Text], b -> a) -> ([DT.Text], a)
+		extractConfItem convert fallback label (labels, fn) = (label : labels, fn $ either (const fallback) convert (DC.get configuration defaultSection (DT.unpack label)))
+		extractConfTextItem = extractConfItem DT.pack
+		extractConfNumItem = extractConfItem read
+		-- no point in opening a SQLite database more than once.
+		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem "jackrose.sqlite" "tablesFile" ([], PerstQ.createSqlitePool)
+	makeUnknownKeyMsg key = DT.concat [ DT.pack configName, ": unknown key ", key ]
+	makeUnseenKeyMsg key = DT.concat [ DT.pack configName, ": using default ", key ]
+	-- If a configuration file is specified, it has to exist;  otherwise the default name is used, but may not exist.
+	conFallback = DMy.isNothing (CommandArgs.configName argsMap)
+	configName = DMy.fromMaybe "/etc/jackrose.conf" (CommandArgs.configName argsMap)
 
 
-configToSite :: String -> JRState.JRState -> IO JRState.JRState
-configToSite configName site = (CME.runExceptT $ pipe configName site) >>= either (estate site) return
+initConfig :: DC.ConfigParser
+initConfig = DC.emptyCP{DC.optionxform=id}
 
 
-portTCP :: JRState.JRState -> Int
-portTCP site = DM.fromMaybe (if JRState.secureOnly site then 443 else 80) (JRState.portNumber site)
+errorInConfig :: Show a => (a, String) -> String
+errorInConfig (errData, location) = location ++ "###" ++ show errData
 
 
-estate :: Show t => JRState.JRState -> t -> IO JRState.JRState
-estate site err = (putStrLn $ "<<" ++ show err ++ ">>") >> return site
+authory :: Bool -> AuthoriStyle.Style
+authory False = AuthoriStyle.Trust
+authory True = AuthoriStyle.Email
 
 
-pipe :: (CME.MonadError DC.CPError m, CME.MonadIO m) => FilePath -> JRState.JRState -> m JRState.JRState
-pipe configName site =
-	(CME.join $ CME.liftIO $ DC.readfile DC.emptyCP{DC.optionxform=id} configName) >>= foldInCfg site
-
-
-foldInCfg :: Monad m => JRState.JRState -> DC.ConfigParser -> m JRState.JRState
-foldInCfg site configuration =
-	return $ foldl mergeIn site seckeys where
-		mergeIn ss0 key = splice ss0 (DL.lookup key siteAlterMap) where
-			splice _ Nothing = error $ "invalid key " ++ key ++ " in configuration file"
-			splice ss (Just fn) = splice' ss fn
-			splice' ss (AB fn) = fn ss arg where (Right arg) = DC.get configuration defaultSection key
-			splice' ss (AI fn) = fn ss arg where (Right arg) = DC.get configuration defaultSection key
-			splice' ss (AS fn) = fn ss arg where (Right arg) = DC.get configuration defaultSection key
-		(Right seckeys) = DC.options configuration defaultSection
-
-
-type SiteAlterFn a = JRState.JRState -> a -> JRState.JRState
-
-
-data SiteAlterVector = AB (SiteAlterFn Bool)
-	| AI (SiteAlterFn Int)
-	| AS (SiteAlterFn String)
-
-
-siteAlterMap :: [(DC.OptionSpec, SiteAlterVector)]
-siteAlterMap = [
-	("secureSession", AB (\site t -> site{JRState.secureOnly = t})),
-	("sessionMinutes", AI (\site t -> site{JRState.sessionTimeout = t})),
-	("portNumber", AI (\site t -> site{JRState.portNumber = Just t})),
-	("tablesFile", AS (\site t -> site{JRState.tablesFile = DT.pack t})),
-	("userTemplate", AS (\site t -> site{JRState.userTemplate = DT.pack t})),
-	("userDir", AS (\site t -> site{JRState.userDir = DT.pack t})),  -- ^ TODO check it has a final /
-	("appRoot", AS (\site t -> site{JRState.appRoot = DT.pack t})),
-	("trustedSite", AB (\site t -> if t then site{JRState.howAuthorised = AuthoriStyle.Trust} else site)),
-	("keysFile", AS (\site t -> site{JRState.keysFile = t}))
-	]
+-- TODO:  what does this all mean?  http://stackoverflow.com/questions/15448206/yesod-exitfailure-1-when-installing-scaffolded-app
+instance MonadLogger IO where
+	monadLoggerLog _ _ _ = (hPutStrLn stderr) . decodeUtf8 . fromLogStr . toLogStr
 
 
 defaultSection :: String
 defaultSection  = "DEFAULT"
-
-
-defaultConfigFileName :: String
-defaultConfigFileName = "/etc/jackrose.conf"

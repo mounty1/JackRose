@@ -14,7 +14,6 @@ History:  record of item scores.
 -}
 
 
--- {-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 
@@ -22,15 +21,15 @@ module Persistency (persistAction, upgradeDB) where
 
 
 import qualified Database.Persist.Sqlite as PerstQ
-import qualified Yesod as Y
-import qualified Data.Text as DT (Text)
+import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.Logger (MonadLogger)
+import Control.Monad.Trans.Control (MonadBaseControl)
 
 
 -- | pass in a database action and run it on the users table
-persistAction :: (Y.MonadBaseControl IO m, Y.MonadIO m, Y.MonadLogger m) => PerstQ.SqlPersistT m a -> DT.Text -> m a
-persistAction action table = PerstQ.withSqliteConn table enaction where
-	enaction = PerstQ.runSqlConn action
+persistAction :: (MonadBaseControl IO m, MonadIO m, MonadLogger m) => PerstQ.SqlPersistT m a ->PerstQ.ConnectionPool -> m a
+persistAction = PerstQ.runSqlPool
 
 
-upgradeDB :: (Y.MonadBaseControl IO m, Y.MonadIO m) => DT.Text -> PerstQ.Migration -> m ()
-upgradeDB table migration = PerstQ.runSqlite table (PerstQ.runMigration migration)
+upgradeDB :: (MonadBaseControl IO m, MonadIO m) => PerstQ.ConnectionPool -> PerstQ.Migration -> m ()
+upgradeDB pool migration = PerstQ.runSqlPool (PerstQ.runMigration migration) pool

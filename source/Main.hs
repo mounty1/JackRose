@@ -18,10 +18,11 @@ import qualified Yesod as Y (warp)
 import qualified Authorisation (migrateData)
 import qualified LearningData (migrateData)
 import qualified Persistency (upgradeDB)
-import qualified Configure (siteObject, portTCP)
+import qualified Configure (siteObject)
 import qualified CommandArgs (args)
 import qualified JRState (JRState(..))
 import qualified Application () -- just to get the instance and the dispatcher
+import Data.Maybe (fromMaybe)
 
 
 -- | Start here.
@@ -36,4 +37,4 @@ main = CommandArgs.args >>= Configure.siteObject >>= letsGo
 letsGo :: JRState.JRState -> IO ()
 letsGo site =
 	mapM_ (Persistency.upgradeDB (JRState.tablesFile site)) [Authorisation.migrateData, LearningData.migrateData]
-	>> Y.warp (Configure.portTCP site) site
+	>> Y.warp (fromMaybe (if JRState.secureOnly site then 443 else 80) (JRState.portNumber site)) site

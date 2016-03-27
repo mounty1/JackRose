@@ -11,6 +11,7 @@ Portability: undefined
 module JRState where
 
 
+import qualified Database.Persist.Sqlite as PerstQ (ConnectionPool)
 import qualified AuthoriStyle (Style)
 import Data.Text (Text)
 import ConfigParse (UserSchema)
@@ -23,14 +24,14 @@ type UserConfig = TVar (Map Text UserSchema)
 
 -- | The foundation object
 data JRState = JRState {
+		tablesFile :: PerstQ.ConnectionPool,
+			-- ^ name of file containing SQLite3 tables
 		secureOnly :: Bool,
 			-- ^ restrict connections to HTTPS
 		sessionTimeout :: Int,
 			-- ^ in minutes
 		portNumber :: Maybe Int,
 			-- ^ useful to override for non-privileged testing
-		tablesFile :: Text,
-			-- ^ name of file containing SQLite3 tables
 		userTemplate :: Text,
 			-- starting template;  copied when a new user account be set up.
 		userDir :: Text,
