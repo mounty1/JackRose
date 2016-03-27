@@ -8,6 +8,9 @@ Portability: undefined
 -}
 
 
+{-# LANGUAGE OverloadedStrings #-}
+
+
 module EmailVerification (newAccountEmail, resetAccountEmail) where
 
 
@@ -15,8 +18,8 @@ import qualified Yesod.Core as YC
 import qualified Data.Text as DT (Text, pack, concat)
 import qualified Network.Mail.SMTP as SMTP
 import qualified Network.Mail.Mime as Mime
-import qualified Logging
 import qualified Data.Text.Lazy as DTL
+import Control.Monad.Logger (logInfoN)
 
 
 newAccountEmail, resetAccountEmail :: (YC.MonadIO m, YC.MonadLogger m) => DT.Text -> DT.Text -> DT.Text -> m ()
@@ -26,15 +29,15 @@ newAccountEmail = emailAction "Verification"
 resetAccountEmail = emailAction "Reset password"
 
 
-emailAction :: (YC.MonadLogger m, YC.MonadIO m) => String -> DT.Text -> DT.Text -> DT.Text -> m ()
+emailAction :: (YC.MonadLogger m, YC.MonadIO m) => DT.Text -> DT.Text -> DT.Text -> DT.Text -> m ()
 emailAction text uname email url = do
 	YC.liftIO $ SMTP.sendMail "localhost" (makeEmail uname email url)
 	logAccountEmail uname email url text
 
 
-logAccountEmail :: YC.MonadLogger m => DT.Text -> DT.Text -> DT.Text -> String -> m ()
+logAccountEmail :: YC.MonadLogger m => DT.Text -> DT.Text -> DT.Text -> DT.Text -> m ()
 logAccountEmail uname email url action =
-	Logging.logInfo $ DT.concat [ DT.pack action, DT.pack " email for ", uname, DT.pack " (", email, DT.pack "): ", url ]
+	logInfoN $ DT.concat [ action, DT.pack " email for ", uname, DT.pack " (", email, DT.pack "): ", url ]
 
 
 -- | http://nginx.com/resources/admin-guide/reverse-proxy/ section "Passing Request Headers" for more details
