@@ -238,9 +238,11 @@ viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context 
 dataSourceVariant :: XMLFileContext -> DT.Text -> Attributes -> Either DT.Text DataSource.DataVariant
 
 dataSourceVariant context "Postgres" attrs =
-	(\[thisServer, thisDatabase, thisTable] -> DataSource.Postgres thisServer portNo thisDatabase nameSpace thisTable) <$> attrList context attrs [ "server", "database", "table" ] where
+	(\[thisServer, thisDatabase, thisTable] -> DataSource.Postgres thisServer portNo thisDatabase nameSpace thisTable thisUser thisPass) <$> attrList context attrs [ "server", "database", "table" ] where
 	portNo = maybeIntAttrValue "port" attrs
 	nameSpace = maybeAttrValue "namespace" attrs
+	thisUser = maybeAttrValue "username" attrs
+	thisPass = maybeAttrValue "password" attrs
 
 dataSourceVariant context "SQLite3" attrs =
 	(\[ fileName ] -> DataSource.Sqlite3 fileName) <$> attrList context attrs [ "filename" ]

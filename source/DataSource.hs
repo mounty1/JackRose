@@ -13,11 +13,11 @@ Data sources are the content of question/answer pairs.  They can be SQL tables, 
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module DataSource (DataSource(..), DataVariant(..)) where
+module DataSource (DataSource(..), DataVariant(..), enSerialise, deSerialise) where
 
 
 import TextShow (showt)
-import qualified Data.Text as DT (splitOn, Text, singleton, concat, empty, null, isInfixOf, head, length)
+import qualified Data.Text as DT (splitOn, Text, filter, singleton, concat, empty, null, head, length)
 import qualified Data.Text.Read as DTR (decimal)
 import Data.List (intersperse)
 
@@ -26,7 +26,7 @@ data DataSource = DataSource DT.Text DT.Text DataVariant
 
 
 data DataVariant
-        = Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text }
+        = Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
         | Sqlite3 { tableName :: DT.Text }
         | CSV { separator :: Char, fileCSV :: DT.Text }
         | XMLSource { fileXML :: DT.Text }
@@ -40,8 +40,12 @@ showMT :: Maybe DT.Text -> DT.Text
 showMT = maybe DT.empty id
 
 
+breakChar :: Char
+breakChar = '\n'
+
+
 fs :: DT.Text
-fs = "/"
+fs = DT.singleton breakChar
 
 
 maybeIntValue :: DT.Text -> Maybe Int
@@ -54,18 +58,14 @@ reduceIt _ = Nothing
 
 
 flatten :: [DT.Text] -> DT.Text
-flatten = DT.concat . intersperse fs
+flatten = DT.concat . intersperse fs . map (DT.filter ((/=) breakChar))
 
 
 enSerialise :: DataVariant -> DT.Text
-enSerialise (Postgres serverIP portNo dbase nameSpace dtable) = flatten [ "P", serverIP, showMI portNo, dbase, showMT nameSpace, dtable ]
+enSerialise (Postgres serverIP portNo dbase nameSpace dtable userName passWord) = flatten [ "P", serverIP, showMI portNo, dbase, showMT nameSpace, dtable, showMT userName, showMT passWord ]
 enSerialise (Sqlite3 dtableName) = flatten [ "Q", dtableName ]
 enSerialise (CSV recseparator ffileCSV) = flatten [ "C", DT.singleton recseparator, ffileCSV ]
 enSerialise (XMLSource ffileXML) = flatten [ "X", ffileXML ]
-
-
-excludesFS :: DT.Text -> Bool
-excludesFS = not . DT.isInfixOf fs
 
 
 deSerialise :: DT.Text -> Maybe DataVariant
@@ -73,13 +73,15 @@ deSerialise = deSerialise' . DT.splitOn fs
 
 
 deSerialise' :: [DT.Text] -> Maybe DataVariant
-deSerialise' [ "P", serverIP, maybePort, dbase, maybeNamespace, dtable ] =
+deSerialise' [ "P", serverIP, maybePort, dbase, maybeNamespace, dtable, maybeUsername, maybePassword ] =
 		Just $ Postgres
 			serverIP
 			(maybeIntValue maybePort)
 			dbase
-			(if DT.null maybeNamespace then Just maybeNamespace else Nothing)
+			(if DT.null maybeNamespace then Nothing else Just maybeNamespace)
 			dtable
+			(if DT.null maybeUsername then Nothing else Just maybeUsername)
+			(if DT.null maybePassword then Nothing else Just maybePassword)
 deSerialise' [ "Q", dtableName ]  = Just $ Sqlite3 dtableName
 deSerialise' [ "C", recseparator, ffileCSV ] =
 		if DT.length recseparator == 1 then

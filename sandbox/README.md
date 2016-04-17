@@ -80,3 +80,8 @@ In the simple case, open your browser and navigate to http://localhost:3000
 Then create your account, using the same login as the configuration XML you
 just modified.  You should then see the question item as set up in your
 configuration XML.  So far, that's all it does.
+
+
+## Read-only access to Postgres tables
+
+See [this](http://jamie.curle.io/posts/creating-a-read-only-user-in-postgres/).

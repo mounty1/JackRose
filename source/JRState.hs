@@ -11,7 +11,7 @@ Portability: undefined
 module JRState where
 
 
-import qualified Database.Persist.Sqlite as PerstQ (ConnectionPool)
+import Database.Persist.Sqlite (ConnectionPool)
 import qualified AuthoriStyle (Style)
 import Data.Text (Text)
 import ConfigParse (UserSchema)
@@ -24,7 +24,7 @@ type UserConfig = TVar (Map Text UserSchema)
 
 -- | The foundation object
 data JRState = JRState {
-		tablesFile :: PerstQ.ConnectionPool,
+		tablesFile :: ConnectionPool,
 			-- ^ name of file containing SQLite3 tables
 		secureOnly :: Bool,
 			-- ^ restrict connections to HTTPS
@@ -38,6 +38,8 @@ data JRState = JRState {
 			-- directory containing user configurations.
 		keysFile :: FilePath,
 			-- ^ AES keys
+		databaseUser :: Text,
+			-- ^ default account with which to open database source tables.
 		appRoot :: Text,
 			-- ^ needed for identification emails
 		debugging :: Bool,

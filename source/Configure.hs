@@ -54,12 +54,13 @@ siteObject argsMap = runStderrLoggingT ((liftIO $ atomically $ newTVar DM.empty)
 			extractConfItem authory AuthoriStyle.Email "trustedSite" $
 				extractConfItem id (CommandArgs.debuggery argsMap) "debug" $
 					extractConfTextItem DT.empty "appRoot" $
-						extractConfItem id "jackrose.aes" "keysFile" $
-							extractConfTextItem "users/" "userDir" $
-								extractConfTextItem "default.cfg" "userTemplate" $
-									extractConfItem Just Nothing "portNumber" $
-										extractConfNumItem 120 "sessionMinutes" $
-											extractConfItem id True "secureSession" $ (connLabels, JRState.JRState pool)
+						extractConfItem id "jackrose" "dbuser" $
+							extractConfItem id "jackrose.aes" "keysFile" $
+								extractConfTextItem "users/" "userDir" $
+									extractConfTextItem "default.cfg" "userTemplate" $
+										extractConfItem Just Nothing "portNumber" $
+											extractConfNumItem 120 "sessionMinutes" $
+												extractConfItem id True "secureSession" $ (connLabels, JRState.JRState pool)
 		-- create the site object and return it, logging information, warnings and errors as required.
 		spliceShared (labels, fn) keysE = either munchErr munchKeys keysE >> (liftIO $ return site) where
 			munchErr = logErrorNS configLogName . DT.pack . show
@@ -72,8 +73,10 @@ siteObject argsMap = runStderrLoggingT ((liftIO $ atomically $ newTVar DM.empty)
 		extractConfItem convert fallback label (labels, fn) = (label : labels, fn $ either (const fallback) convert (DC.get configuration defaultSection (DT.unpack label)))
 		extractConfTextItem = extractConfItem DT.pack
 		extractConfNumItem = extractConfItem read
+
 		-- no point in opening a SQLite database more than once.
 		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem "jackrose.sqlite" "tablesFile" ([], PerstQ.createSqlitePool)
+
 	makeUnknownKeyMsg key = DT.concat [ "unknown key ", key ]
 	makeUnseenKeyMsg key = DT.concat [ "using default ", key ]
 	-- If a configuration file is specified, it has to exist;  otherwise the default name is used, but may not exist.

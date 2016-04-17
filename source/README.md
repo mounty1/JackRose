@@ -35,6 +35,10 @@
 
 - One-to-many cards.
 
+- http://www.nifdi.org/resources/free-downloads/suggested-reading/white-papers-by-zig/900-student-program-alignment-and-teaching-to-mastery-by-siegfried-engelmann/file
+
+- layered or leveled cards:  http://sfondilias.com/publications/calculus1987.pdf
+
 - Debug/info. Mode checks attributes: [optional missing] [optional present] [unknown-present].
 
 - Security Model. Configurable, hierarchical write rights to data.
@@ -48,6 +52,7 @@
 - Security:  https://github.com/pillarjs/understanding-csrf
 https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29_Prevention_Cheat_Sheet
 
+- Security:  HPKP http://www.theregister.co.uk/2016/03/24/see_a_pin_and_pick_it_up_for_the_sake_of_security/
 
 # CODING AND LAYOUT STANDARDS
 

@@ -17,7 +17,7 @@ History:  record of item scores.
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving #-}
 
 
-module LearningData (migrateData) where
+module LearningData (migrateData, DataSource(..), DataRow(..), View(..), LearnDatum(..), History(..)) where
 
 
 import qualified Yesod as Y

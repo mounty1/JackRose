@@ -23,6 +23,7 @@ import qualified CommandArgs (args)
 import qualified JRState (JRState(..))
 import qualified Application () -- just to get the instance and the dispatcher
 import Data.Maybe (fromMaybe)
+import qualified LearningResync (update)
 
 
 -- | Start here.
@@ -37,4 +38,5 @@ main = CommandArgs.args >>= Configure.siteObject >>= letsGo
 letsGo :: JRState.JRState -> IO ()
 letsGo site =
 	mapM_ (Persistency.upgradeDB (JRState.tablesFile site)) [Authorisation.migrateData, LearningData.migrateData]
+	>> LearningResync.update site
 	>> Y.warp (fromMaybe (if JRState.secureOnly site then 443 else 80) (JRState.portNumber site)) site

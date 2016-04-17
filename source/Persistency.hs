@@ -27,7 +27,7 @@ import Control.Monad.Trans.Control (MonadBaseControl)
 
 
 -- | pass in a database action and run it on the users table
-persistAction :: (MonadBaseControl IO m, MonadIO m, MonadLogger m) => PerstQ.SqlPersistT m a ->PerstQ.ConnectionPool -> m a
+persistAction :: (MonadBaseControl IO m, MonadIO m, MonadLogger m) => PerstQ.SqlPersistT m a -> PerstQ.ConnectionPool -> m a
 persistAction = PerstQ.runSqlPool
 
 
