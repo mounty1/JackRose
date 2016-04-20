@@ -17,14 +17,14 @@ module DataSource (DataSource(..), DataVariant(..), enSerialise, deSerialise) wh
 
 
 import TextShow (showt)
-import qualified Data.Text as DT (splitOn, Text, filter, singleton, concat, empty, null, head, length)
+import qualified Data.Text as DT (Text, singleton, empty, null, head, length)
 import qualified Data.Text.Read as DTR (decimal)
-import Data.List (intersperse)
+import qualified TextList as DL (enSerialise, deSerialise)
 
 
 data DataSource = DataSource DT.Text DT.Text DataVariant
 
-
+-- | All the details to identify a data source without actually opening a connection to it.
 data DataVariant
         = Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
         | Sqlite3 { tableName :: DT.Text }
@@ -40,14 +40,6 @@ showMT :: Maybe DT.Text -> DT.Text
 showMT = maybe DT.empty id
 
 
-breakChar :: Char
-breakChar = '\n'
-
-
-fs :: DT.Text
-fs = DT.singleton breakChar
-
-
 maybeIntValue :: DT.Text -> Maybe Int
 maybeIntValue = reduceIt . DTR.decimal
 
@@ -57,19 +49,15 @@ reduceIt (Right (n, "")) = Just n
 reduceIt _ = Nothing
 
 
-flatten :: [DT.Text] -> DT.Text
-flatten = DT.concat . intersperse fs . map (DT.filter ((/=) breakChar))
-
-
 enSerialise :: DataVariant -> DT.Text
-enSerialise (Postgres serverIP portNo dbase nameSpace dtable userName passWord) = flatten [ "P", serverIP, showMI portNo, dbase, showMT nameSpace, dtable, showMT userName, showMT passWord ]
-enSerialise (Sqlite3 dtableName) = flatten [ "Q", dtableName ]
-enSerialise (CSV recseparator ffileCSV) = flatten [ "C", DT.singleton recseparator, ffileCSV ]
-enSerialise (XMLSource ffileXML) = flatten [ "X", ffileXML ]
+enSerialise (Postgres serverIP portNo dbase nameSpace dtable userName passWord) = DL.enSerialise [ "P", serverIP, showMI portNo, dbase, showMT nameSpace, dtable, showMT userName, showMT passWord ]
+enSerialise (Sqlite3 dtableName) = DL.enSerialise [ "Q", dtableName ]
+enSerialise (CSV recseparator ffileCSV) = DL.enSerialise [ "C", DT.singleton recseparator, ffileCSV ]
+enSerialise (XMLSource ffileXML) = DL.enSerialise [ "X", ffileXML ]
 
 
 deSerialise :: DT.Text -> Maybe DataVariant
-deSerialise = deSerialise' . DT.splitOn fs
+deSerialise = deSerialise' . DL.deSerialise
 
 
 deSerialise' :: [DT.Text] -> Maybe DataVariant

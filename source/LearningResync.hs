@@ -14,67 +14,129 @@ Data sources may be updated externally to JR.
 {-# LANGUAGE TypeFamilies #-}
 
 
-module LearningResync (update, Connection(..), DataSource(..)) where
+module LearningResync (update) where
 
 
-import qualified Data.Text as DT (Text, empty, pack, unpack)
-import Database.Persist.Sqlite (runSqlPool, selectList)
+import Data.Time (getCurrentTime)
+import Persistency (persistAction)
+import Control.Exception (catch)
+import Data.List (foldl', intersperse)
+import qualified Data.Text as DT (Text, concat, empty, pack, unpack)
+import qualified Database.Persist.Class (Key)
+import Database.Persist.Sql (Entity)
+import Database.Persist.Sqlite (ConnectionPool, runSqlPool, selectList)
 import Database.Persist (replace)
+import Database.Persist.Sql (insertBy)
 import Database.Persist.Types (entityKey, entityVal)
-import Control.Monad.Logger (runStderrLoggingT, MonadLogger, logInfoN)
+import Control.Monad.Logger (runStderrLoggingT)
 import DataSource (deSerialise)
+import TextList (enSerialise)
 import Data.Maybe (fromMaybe)
 import qualified JRState (JRState(..))
-import qualified LearningData (DataSource(..))
+import qualified LearningData (DataSource(..), DataRow(..))
 import qualified DataSource as DS (DataVariant(..))
-import qualified Database.HSQL as HSQL (ColDef, describe, Connection)
+import qualified Database.HSQL as HSQL (Statement, ColDef, SqlError, describe, Connection, query, forEachRow', collectRows, getFieldValue)
 import Database.HSQL.PostgreSQL (connectWithOptions)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Logger (LoggingT, logDebugNS, logWarnNS)
 
 
+-- | Create handles or connections to all data sources;  then read them to be sure
+-- all records are known.
 update :: JRState.JRState -> IO ()
-update site = runStderrLoggingT $ runSqlPool (selectList [] []) pool >>= mapM_ updateOneSource where
-	updateOneSource entity = resyncOneSource site (entityVal entity) >>= updateSourceRecord (entityKey entity)
-	updateSourceRecord entyKey afterSource = runSqlPool (replace entyKey afterSource) pool
-	pool = JRState.tablesFile site
+update site = runStderrLoggingT $ runSqlPool (selectList [] []) (JRState.tablesFile site) >>= foldl' (updateOneSource site) (liftIO $ return ())
 
 
-resyncOneSource :: MonadLogger m => JRState.JRState -> LearningData.DataSource -> m LearningData.DataSource
-resyncOneSource site sourceRecord = logInfoN (DT.pack "SYNCING")
-		>> return sourceRecord where
-	maybeSourceHandle = fmap (connection site) (deSerialise $ LearningData.dataSourceSourceSerial sourceRecord)
+updateOneSource :: JRState.JRState -> LoggingT IO () -> Entity LearningData.DataSource -> LoggingT IO ()
+
+updateOneSource site dummy sourceRecord = maybe badConnString mkConnection (deSerialise dataSourceString) where
+
+	badConnString = logWarnNS dataShortString $ DT.concat [DT.pack "Invalid data source: ", dataSourceString]
+
+	mkConnection :: DS.DataVariant -> LoggingT IO ()
+	mkConnection connClass = liftIO (connection site connClass) >>= reSyncRows
+
+	reSyncRows :: OpenDataSource -> LoggingT IO ()
+	reSyncRows (Unavailable justification) = logWarnNS dataShortString justification
+	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO (reSyncOneSource openConn colheads priKeys dataSourceKey learningPersistPool)
+			>> runSqlPool (replace dataSourceKey dataSourceParts) learningPersistPool >> dummy
+
+	learningPersistPool = JRState.tablesFile site
+	dataSourceKey = entityKey sourceRecord
+	dataSourceParts = entityVal sourceRecord
+	dataSourceString = LearningData.dataSourceSourceSerial dataSourceParts
+	dataShortString = LearningData.dataSourceShortName dataSourceParts
 
 
-data DataSource = DataSource {
-		source :: Connection,
-		fields :: [DT.Text]
-	}
+data OpenDataSource = OpenDataSource OpenConnection [DT.Text] [DT.Text] | Unavailable DT.Text
 
 
-data Connection = Postgres { connectionSQL :: HSQL.Connection, table :: DT.Text }
-		| Sqlite3 { tableName :: DT.Text }
-		| CSV { separator :: Char, fileCSV :: DT.Text }
-		| XMLSource { fileXML :: DT.Text }
+data OpenConnection = Postgres HSQL.Connection DT.Text | Sqlite3 DT.Text | CSV Char DT.Text | XMLSource DT.Text
 
 
-connection :: JRState.JRState -> DS.DataVariant -> IO DataSource
-connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybeUser maybePassword) =
-		connectWithOptions (DT.unpack serverIP) (fmap show maybePort) Nothing Nothing (DT.unpack dbase) (DT.unpack $ fromMaybe (JRState.databaseUser site) maybeUser) (DT.unpack $ fromMaybe DT.empty maybePassword) >>= pullStructure where
-			pullStructure conn = HSQL.describe conn (DT.unpack dataTable) >>= mashIntoFields where
-				mashIntoFields rows = return $ DataSource (Postgres conn dataTable) (map putColHead rows)
-			-- primyKeysQuery = "SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ DT.unpack dataTable ++ "\"'::regclass AND i.indisprimary ORDER BY a.attnum;"
+reSyncOneSource :: OpenConnection -> [DT.Text] -> [DT.Text] -> Database.Persist.Class.Key LearningData.DataSource -> ConnectionPool -> IO ()
 
-connection _ (DS.Sqlite3 dtableName) = return $ DataSource (Sqlite3 dtableName) []
+reSyncOneSource (Postgres sourceConn sourceDBtable) _ primaryKey sourceKey learningPersistPool = HSQL.query sourceConn primyKeyQuery >>= HSQL.forEachRow' row1yKeyUpdate where
+	-- extract primary key value from row, add timestamp and attempt insertion
+	row1yKeyUpdate stmt = row1yKeyValue stmt >>= \keyValue -> getCurrentTime >>= tryInsert keyValue
+	-- insert one key value into learning data, if it not already exist therein
+	-- we don't log anything because the Persist calls do it all
+	tryInsert keyValue timeStamp = runStderrLoggingT (persistAction (insertBy (LearningData.DataRow keyValue sourceKey timeStamp)) learningPersistPool >> return ()
+	-- primary key fields serialised into one Text
+	row1yKeyValue stmt = enSerialise `fmap` mapM (columnValue stmt) primaryKey
+	-- SQL to select primary key data rows
+	primyKeyQuery = "SELECT " ++ primyKeysForQ ++ " FROM \"" ++ DT.unpack sourceDBtable ++ "\";"
+	-- comma-separated list of primary key fields
+	primyKeysForQ = DT.unpack $ DT.concat $ intersperse packedComma $ map enQuote primaryKey
 
-connection _ (DS.CSV recSep ffileCSV) = return $ DataSource (CSV recSep ffileCSV) []
 
-connection _ (DS.XMLSource ffileXML) = return $ DataSource (XMLSource ffileXML) []
+columnValue :: HSQL.Statement -> DT.Text -> IO DT.Text
+columnValue stmt colName = DT.pack `fmap` HSQL.getFieldValue stmt (DT.unpack colName)
+
+
+connection :: JRState.JRState -> DS.DataVariant -> IO OpenDataSource
+
+connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybeUser maybePassword) = catch (neoConn >>= pullStructure) sourceFail where
+	neoConn = connectWithOptions
+			(DT.unpack serverIP)
+			(fmap show maybePort)
+			Nothing
+			Nothing
+			(DT.unpack dbase)
+			(DT.unpack $ fromMaybe (JRState.databaseUser site) maybeUser)
+			(DT.unpack $ fromMaybe DT.empty maybePassword)
+	pullStructure conn = HSQL.describe conn tableNameStr >>= mashIntoFields conn
+	mashIntoFields conn rows = primaryKey conn >>= (\py -> return $ OpenDataSource (Postgres conn dataTable) (map putColHead rows) py)
+	sourceFail :: HSQL.SqlError -> IO OpenDataSource
+	sourceFail = return . Unavailable . DT.pack . show
+	primyKeyQuery = "SELECT \"" ++ attName ++ "\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass AND i.indisprimary ORDER BY a.attnum;"
+	tableNameStr = DT.unpack dataTable
+	primaryKey :: HSQL.Connection -> IO [DT.Text]
+	primaryKey conn = HSQL.query conn primyKeyQuery >>= HSQL.collectRows (flip columnValue attNameP)
+
+connection _ (DS.Sqlite3 dtableName) = return $ OpenDataSource (Sqlite3 dtableName) [] []
+
+connection _ (DS.CSV recSep ffileCSV) = return $ OpenDataSource (CSV recSep ffileCSV) [] []
+
+connection _ (DS.XMLSource ffileXML) = return $ OpenDataSource (XMLSource ffileXML) [] []
+
+
+attName :: String
+attName = "attname"
+
+
+attNameP :: DT.Text
+attNameP = DT.pack attName
+
 
 putColHead :: HSQL.ColDef -> DT.Text
 putColHead (colId, _, _) = DT.pack colId
 
 
--- main = catch (connectWithOptions "services" Nothing Nothing Nothing "mounty" "mounty" "--------" >>= actions) handler
+enQuote :: DT.Text -> DT.Text
+enQuote word = DT.concat [packedQuote, word, packedQuote]
 
 
--- handler :: SqlError -> IO ()
--- handler err = print $ "Oh no: " ++ show err
+packedComma, packedQuote :: DT.Text
+packedComma = DT.pack ","
+packedQuote = DT.pack "\""

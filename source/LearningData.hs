@@ -31,6 +31,8 @@ Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCa
 DataSource
 	accessorWrite UserId NOT NULL
 	accessorRead UserId NOT NULL
+	shortName DT.Text UNIQUE NOT NULL
+	longName DT.Text
 	sourceSerial DT.Text UNIQUE NOT NULL
 	resynced UTCTime NOT NULL
 	UniqueSourceSerial sourceSerial
