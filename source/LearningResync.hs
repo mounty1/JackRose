@@ -17,7 +17,7 @@ Data sources may be updated externally to JR.
 module LearningResync (update) where
 
 
-import Data.Time (getCurrentTime)
+import Data.Time (getCurrentTime, UTCTime)
 import Persistency (persistAction)
 import Control.Exception (catch)
 import Data.List (foldl', intersperse)
@@ -28,23 +28,22 @@ import Database.Persist.Sqlite (ConnectionPool, runSqlPool, selectList)
 import Database.Persist (replace)
 import Database.Persist.Sql (insertBy)
 import Database.Persist.Types (entityKey, entityVal)
-import Control.Monad.Logger (runStderrLoggingT)
 import DataSource (deSerialise)
 import TextList (enSerialise)
 import Data.Maybe (fromMaybe)
-import qualified JRState (JRState(..))
+import qualified JRState (JRState(..), runFilteredLoggingT)
 import qualified LearningData (DataSource(..), DataRow(..))
 import qualified DataSource as DS (DataVariant(..))
-import qualified Database.HSQL as HSQL (Statement, ColDef, SqlError, describe, Connection, query, forEachRow', collectRows, getFieldValue)
+import qualified Database.HSQL as HSQL (Statement, ColDef, SqlError, describe, Connection, query, forEachRow, collectRows, getFieldValue)
 import Database.HSQL.PostgreSQL (connectWithOptions)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger (LoggingT, logDebugNS, logWarnNS)
+import Control.Monad.Logger (LoggingT, logWarnNS)
 
 
 -- | Create handles or connections to all data sources;  then read them to be sure
 -- all records are known.
 update :: JRState.JRState -> IO ()
-update site = runStderrLoggingT $ runSqlPool (selectList [] []) (JRState.tablesFile site) >>= foldl' (updateOneSource site) (liftIO $ return ())
+update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (JRState.tablesFile site) >>= foldl' (updateOneSource site) (liftIO $ return ())
 
 
 updateOneSource :: JRState.JRState -> LoggingT IO () -> Entity LearningData.DataSource -> LoggingT IO ()
@@ -58,8 +57,11 @@ updateOneSource site dummy sourceRecord = maybe badConnString mkConnection (deSe
 
 	reSyncRows :: OpenDataSource -> LoggingT IO ()
 	reSyncRows (Unavailable justification) = logWarnNS dataShortString justification
-	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO (reSyncOneSource openConn colheads priKeys dataSourceKey learningPersistPool)
-			>> runSqlPool (replace dataSourceKey dataSourceParts) learningPersistPool >> dummy
+	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO getCurrentTime >>= updateSync where
+		updateSync timeStamp = liftIO (reSyncOneSource openConn site colheads timeStamp priKeys dataSourceKey learningPersistPool) >>= updateSource timeStamp
+		--update time-stamp only replace if new data_rows were inserted.
+		updateSource timeStamp True = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool >> dummy
+		updateSource _ False = dummy
 
 	learningPersistPool = JRState.tablesFile site
 	dataSourceKey = entityKey sourceRecord
@@ -74,14 +76,17 @@ data OpenDataSource = OpenDataSource OpenConnection [DT.Text] [DT.Text] | Unavai
 data OpenConnection = Postgres HSQL.Connection DT.Text | Sqlite3 DT.Text | CSV Char DT.Text | XMLSource DT.Text
 
 
-reSyncOneSource :: OpenConnection -> [DT.Text] -> [DT.Text] -> Database.Persist.Class.Key LearningData.DataSource -> ConnectionPool -> IO ()
+reSyncOneSource :: OpenConnection -> JRState.JRState -> [DT.Text] -> UTCTime -> [DT.Text] -> Database.Persist.Class.Key LearningData.DataSource -> ConnectionPool -> IO Bool
 
-reSyncOneSource (Postgres sourceConn sourceDBtable) _ primaryKey sourceKey learningPersistPool = HSQL.query sourceConn primyKeyQuery >>= HSQL.forEachRow' row1yKeyUpdate where
+reSyncOneSource (Postgres sourceConn sourceDBtable) site _ timeStamp primaryKey sourceKey learningPersistPool = HSQL.query sourceConn primyKeyQuery >>= insertEachRow where
+	insertEachRow statement = HSQL.forEachRow row1yKeyUpdate statement False
 	-- extract primary key value from row, add timestamp and attempt insertion
-	row1yKeyUpdate stmt = row1yKeyValue stmt >>= \keyValue -> getCurrentTime >>= tryInsert keyValue
-	-- insert one key value into learning data, if it not already exist therein
-	-- we don't log anything because the Persist calls do it all
-	tryInsert keyValue timeStamp = runStderrLoggingT (persistAction (insertBy (LearningData.DataRow keyValue sourceKey timeStamp)) learningPersistPool >> return ()
+	row1yKeyUpdate stmt changed = row1yKeyValue stmt >>= tryInsert changed
+	-- Insert one key value into learning data, if it not already exist therein.
+	-- We don't log anything because the Persist calls do it all.
+	-- We accume a Boolean which is 'was anything changed?'
+	tryInsert changed keyValue = JRState.runFilteredLoggingT site (persistAction (insertBy (LearningData.DataRow keyValue sourceKey timeStamp)) learningPersistPool)
+			>>= return . either (const changed) (const True)
 	-- primary key fields serialised into one Text
 	row1yKeyValue stmt = enSerialise `fmap` mapM (columnValue stmt) primaryKey
 	-- SQL to select primary key data rows

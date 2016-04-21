@@ -17,6 +17,8 @@ import Data.Text (Text)
 import ConfigParse (UserSchema)
 import Data.Map (Map)
 import Control.Concurrent.STM (TVar)
+import Control.Monad.Logger (LoggingT, filterLogger, LogLevel(LevelDebug), runStdoutLoggingT)
+import Control.Monad.IO.Class (MonadIO)
 
 
 type UserConfig = TVar (Map Text UserSchema)
@@ -42,9 +44,17 @@ data JRState = JRState {
 			-- ^ default account with which to open database source tables.
 		appRoot :: Text,
 			-- ^ needed for identification emails
-		debugging :: Bool,
-			-- ^ output more information
+		logLevel :: LogLevel,
+			-- ^ detail of diagnostics
 		howAuthorised :: AuthoriStyle.Style,
 			-- ^ not sure and makes no sense now
 		userConfig :: UserConfig
 	}
+
+debugging :: JRState -> Bool
+debugging site = LevelDebug == logLevel site
+
+
+runFilteredLoggingT :: MonadIO m => JRState -> LoggingT m a -> m a
+runFilteredLoggingT site = runStdoutLoggingT . filterLogger (\_ -> (<=) (logLevel site))
+-- runFilteredLoggingT _ = runStdoutLoggingT . filterLogger (\_ _ -> False)

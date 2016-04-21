@@ -1,5 +1,11 @@
 # ARCHITECTURE
 
+- Suppression of logging by level.
+
+- Startup synchronisation:  deletion of removed rows.  Mass-action.
+
+- Duplication of primary key?
+
 - Split:
   - normal operation/running: simple HTML + browser.
   - administration: will need something more sophisticated such as client side

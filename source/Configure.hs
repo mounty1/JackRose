@@ -14,26 +14,28 @@ Portability: undefined
 module Configure (siteObject) where
 
 
-import qualified Data.Text as DT (pack, empty, Text, unpack, concat)
+import qualified Data.Text as DT (pack, empty, Text, unpack, concat, toLower)
 import Data.List ((\\))
 import qualified CommandArgs (CmdLineArgs(..))
 import qualified Data.ConfigFile as DC
 import qualified Data.Maybe as DMy
 import qualified AuthoriStyle (Style(..))
-import qualified JRState (JRState(..), UserConfig)
+import qualified JRState (JRState(..), debugging, UserConfig)
 import qualified Data.Map as DM (empty)
 import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool)
 import Control.Concurrent.STM (newTVar)
 import Control.Monad.STM (atomically)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger (logInfoNS, logWarnNS, logErrorNS, runStderrLoggingT, LoggingT)
+import Control.Monad.Logger (LogLevel(..), logInfoNS, logWarnNS, logErrorNS, runStdoutLoggingT, LoggingT)
 import Control.Monad.Error.Class (catchError)
 
 
 -- | Called once when the application starts;  it takes the command line parameters object and
 -- constructs the Yesod foundation object, logging any warnings, errors and information.
 siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
-siteObject argsMap = runStderrLoggingT ((liftIO $ atomically $ newTVar DM.empty) >>= configurationData) where
+siteObject argsMap = runStdoutLoggingT $ (liftIO $ atomically $ newTVar DM.empty) >>= configurationData where
+	-- It would be nice to use JRState.runFilteredLoggingT here but we can't get the site object out.
+	-- In any case, the logged messages are removable by correcting the configuration file.
 
 	-- feed the user data STM object into the reading of the configuration file.
 	configurationData :: JRState.UserConfig -> LoggingT IO JRState.JRState
@@ -52,7 +54,7 @@ siteObject argsMap = runStderrLoggingT ((liftIO $ atomically $ newTVar DM.empty)
 		makeAppObject pool = spliceShared (almostAppObject pool) (DC.options configuration defaultSection)
 		almostAppObject pool =
 			extractConfItem authory AuthoriStyle.Email "trustedSite" $
-				extractConfItem id (CommandArgs.debuggery argsMap) "debug" $
+				extractConfItem logValue' (if CommandArgs.debuggery argsMap then LevelDebug else LevelInfo) "verbosity" $
 					extractConfTextItem DT.empty "appRoot" $
 						extractConfItem id "jackrose" "dbuser" $
 							extractConfItem id "jackrose.aes" "keysFile" $
@@ -83,6 +85,16 @@ siteObject argsMap = runStderrLoggingT ((liftIO $ atomically $ newTVar DM.empty)
 	conFallback = DMy.isNothing (CommandArgs.configName argsMap)
 	configName = DMy.fromMaybe "/etc/jackrose.conf" (CommandArgs.configName argsMap)
 	configLogName = DT.pack configName
+
+
+logValue', logValue :: DT.Text -> LogLevel
+
+logValue "verbose" = LevelDebug
+logValue "normal" = LevelInfo
+logValue "terse" = LevelWarn
+logValue _ = LevelInfo
+
+logValue' = logValue . DT.toLower
 
 
 initConfig :: DC.ConfigParser
