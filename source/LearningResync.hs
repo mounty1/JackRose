@@ -18,7 +18,6 @@ module LearningResync (update) where
 
 
 import Data.Time (getCurrentTime, UTCTime)
-import Persistency (persistAction)
 import Control.Exception (catch)
 import Data.List (foldl', intersperse)
 import qualified Data.Text as DT (Text, concat, empty, pack, unpack)
@@ -85,7 +84,7 @@ reSyncOneSource (Postgres sourceConn sourceDBtable) site _ timeStamp primaryKey 
 	-- Insert one key value into learning data, if it not already exist therein.
 	-- We don't log anything because the Persist calls do it all.
 	-- We accume a Boolean which is 'was anything changed?'
-	tryInsert changed keyValue = JRState.runFilteredLoggingT site (persistAction (insertBy (LearningData.DataRow keyValue sourceKey timeStamp)) learningPersistPool)
+	tryInsert changed keyValue = JRState.runFilteredLoggingT site (runSqlPool (insertBy (LearningData.DataRow keyValue sourceKey timeStamp)) learningPersistPool)
 			>>= return . either (const changed) (const True)
 	-- primary key fields serialised into one Text
 	row1yKeyValue stmt = enSerialise `fmap` mapM (columnValue stmt) primaryKey

@@ -27,8 +27,7 @@ import qualified Yesod.Core as YC
 import qualified Yesod.Auth as YA
 import qualified Yesod.Auth.Account as YAA
 import qualified Authorisation (User)
-import qualified Database.Persist.Sqlite as PerstQ (SqlBackend)
-import qualified Persistency (persistAction)
+import qualified Database.Persist.Sqlite as PerstQ (SqlBackend, runSqlPool)
 import qualified RouteData
 import qualified EmailVerification
 import qualified Data.Text as DT (concat)
@@ -60,7 +59,7 @@ instance YC.Yesod JRState where
 
 instance Y.YesodPersist JRState where
 	type YesodPersistBackend JRState = PerstQ.SqlBackend
-	runDB action = fmap tablesFile YC.getYesod >>= Persistency.persistAction action
+	runDB action = fmap tablesFile YC.getYesod >>= PerstQ.runSqlPool action
 
 
 instance YC.RenderMessage JRState Y.FormMessage where
