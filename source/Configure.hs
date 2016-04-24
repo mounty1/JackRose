@@ -22,49 +22,51 @@ import qualified Data.Maybe as DMy
 import qualified AuthoriStyle (Style(..))
 import qualified JRState (JRState(..), debugging, UserConfig)
 import qualified Data.Map as DM (empty)
-import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool)
+import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool, ConnectionPool)
 import Control.Concurrent.STM (newTVar)
 import Control.Monad.STM (atomically)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger (LogLevel(..), logInfoNS, logWarnNS, logErrorNS, runStdoutLoggingT, LoggingT)
+import Control.Monad.Logger (LogLevel(..), logInfoNS, logWarnNS, logErrorNS)
 import Control.Monad.Error.Class (catchError)
+import LogFilter (runFilteredLoggingT)
 
 
 -- | Called once when the application starts;  it takes the command line parameters object and
 -- constructs the Yesod foundation object, logging any warnings, errors and information.
 siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
-siteObject argsMap = runStdoutLoggingT $ (liftIO $ atomically $ newTVar DM.empty) >>= configurationData where
-	-- It would be nice to use JRState.runFilteredLoggingT here but we can't get the site object out.
-	-- In any case, the logged messages are removable by correcting the configuration file.
+siteObject argsMap = atomically (newTVar DM.empty) >>= configurationData where
 
 	-- feed the user data STM object into the reading of the configuration file.
-	configurationData :: JRState.UserConfig -> LoggingT IO JRState.JRState
+	configurationData :: JRState.UserConfig -> IO JRState.JRState
 	configurationData sharedData =
 		-- if the configuration file name be specified, it must be readable, but the default file need not exist.
-		(if conFallback then flip catchError warnBadConfigFile else id) (liftIO $ DC.readfile initConfig configName) >>=
-			either (liftIO . return . error . errorInConfig) (assembleConf sharedData)
-	warnBadConfigFile err = logWarnNS configLogName (DT.pack $ show err) >> (liftIO $ return $ Right initConfig)
+		(if conFallback then flip catchError warnBadConfigFile else id) (DC.readfile initConfig configName) >>=
+			either (return . error . errorInConfig) (assembleConf sharedData)
+
+	-- we can't use the configured logging level because the configuration file can't be read.
+	warnBadConfigFile :: Show s => s -> IO (Either a DC.ConfigParser)
+	warnBadConfigFile err = runFilteredLoggingT fallbackDebugLevel (logWarnNS configLogName (DT.pack $ show err)) >> (return $ Right initConfig)
 
 	-- feed the user data STM, the configuration file contents and now the database connection pool, into the creation of the site object.
-	assembleConf :: JRState.UserConfig -> DC.ConfigParser -> LoggingT IO JRState.JRState
-	assembleConf sharedData configuration = connPoolM >>= makeAppObject where
+	assembleConf :: JRState.UserConfig -> DC.ConfigParser -> IO JRState.JRState
+	assembleConf sharedData configuration = runFilteredLoggingT verbosity connPoolM >>= makeAppObject where
 
 		-- accumulate up the fields of the site object, one by one.
 		-- the list of configuration key values is of course static, but subject to maintenance.
+		makeAppObject :: PerstQ.ConnectionPool ->  IO JRState.JRState
 		makeAppObject pool = spliceShared (almostAppObject pool) (DC.options configuration defaultSection)
 		almostAppObject pool =
 			extractConfItem authory AuthoriStyle.Email "trustedSite" $
-				extractConfItem logValue' (if CommandArgs.debuggery argsMap then LevelDebug else LevelInfo) "verbosity" $
-					extractConfTextItem DT.empty "appRoot" $
-						extractConfItem id "jackrose" "dbuser" $
-							extractConfItem id "jackrose.aes" "keysFile" $
-								extractConfTextItem "users/" "userDir" $
-									extractConfTextItem "default.cfg" "userTemplate" $
-										extractConfItem Just Nothing "portNumber" $
-											extractConfNumItem 120 "sessionMinutes" $
-												extractConfItem id True "secureSession" $ (connLabels, JRState.JRState pool)
+				extractConfTextItem DT.empty "appRoot" $
+					extractConfItem id "jackrose" "dbuser" $
+						extractConfItem id "jackrose.aes" "keysFile" $
+							extractConfTextItem "users/" "userDir" $
+								extractConfTextItem "default.cfg" "userTemplate" $
+									extractConfItem Just Nothing "portNumber" $
+										extractConfNumItem 120 "sessionMinutes" $
+											extractConfItem id True "secureSession" $ (connLabels, JRState.JRState verbosity pool)
 		-- create the site object and return it, logging information, warnings and errors as required.
-		spliceShared (labels, fn) keysE = either munchErr munchKeys keysE >> (liftIO $ return site) where
+		spliceShared :: Show l => ([DT.Text], JRState.UserConfig -> JRState.JRState) -> Either l [String] -> IO JRState.JRState
+		spliceShared (labels, fn) keysE = runFilteredLoggingT verbosity (either munchErr munchKeys keysE) >> (return site) where
 			munchErr = logErrorNS configLogName . DT.pack . show
 			munchKeys keys = (if JRState.debugging site then (>>) (mapM_ (logInfoNS configLogName . makeUnseenKeyMsg) (labels \\ keysInConfig)) else id) (mapM_ (logWarnNS configLogName . makeUnknownKeyMsg) (keysInConfig \\ labels)) where
 				keysInConfig = map DT.pack keys
@@ -77,7 +79,12 @@ siteObject argsMap = runStdoutLoggingT $ (liftIO $ atomically $ newTVar DM.empty
 		extractConfNumItem = extractConfItem read
 
 		-- no point in opening a SQLite database more than once.
-		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem "jackrose.sqlite" "tablesFile" ([], PerstQ.createSqlitePool)
+		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem "jackrose.sqlite" "tablesFile" (verbLabel, PerstQ.createSqlitePool)
+
+		-- we need verbosity early to control logging level
+		(verbLabel, verbosity) = extractConfItem logValue fallbackDebugLevel "verbosity" ([], id)
+
+	fallbackDebugLevel = if CommandArgs.debuggery argsMap then LevelDebug else defaultLogLevel
 
 	makeUnknownKeyMsg key = DT.concat [ "unknown key ", key ]
 	makeUnseenKeyMsg key = DT.concat [ "using default ", key ]
@@ -87,14 +94,16 @@ siteObject argsMap = runStdoutLoggingT $ (liftIO $ atomically $ newTVar DM.empty
 	configLogName = DT.pack configName
 
 
-logValue', logValue :: DT.Text -> LogLevel
+logValue :: DT.Text -> LogLevel
+logValue word = DMy.fromMaybe defaultLogLevel (lookup (DT.toLower word) debugLevels)
 
-logValue "verbose" = LevelDebug
-logValue "normal" = LevelInfo
-logValue "terse" = LevelWarn
-logValue _ = LevelInfo
 
-logValue' = logValue . DT.toLower
+debugLevels :: [(DT.Text, LogLevel)]
+debugLevels = [ ("verbose", LevelDebug), ("normal", LevelInfo), ("terse", LevelWarn) ]
+
+
+defaultLogLevel :: LogLevel
+defaultLogLevel = LevelInfo
 
 
 initConfig :: DC.ConfigParser
