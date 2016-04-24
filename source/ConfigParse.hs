@@ -27,7 +27,7 @@ import qualified Text.XML as XML
 import qualified Data.Map as DM
 import qualified Data.Maybe as DMy
 import qualified Data.Char as DC (isSpace)
-import Control.Applicative ((<$>), (<*>))
+-- import Control.Applicative ((<$>), (<*>))
 import qualified DataSource
 
 
@@ -66,10 +66,7 @@ data View = View {
 	}
 
 
-data UserSchema = UserSchema {
-		sources :: [DataSource.DataSource],  -- ^ read-only data sources.
-		views :: [View]
-	}
+data UserSchema = UserSchema [View]
 
 
 type XMLFileContext = [DT.Text]
@@ -86,8 +83,9 @@ content sourceName debuggery (XML.Document _ top@(XML.Element (XML.Name "jackros
 				contents context children nullSchema
 			else
 				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""]
+		checkVersionAttrValue _ = failToParse context invalidItem
 		context = [ tagText top, "File=" `DT.append` sourceName ]
-		nullSchema = Logged [] (if debuggery then Just [] else Nothing) (UserSchema [] [])
+		nullSchema = Logged [] (if debuggery then Just [] else Nothing) (UserSchema [])
 
 content sourceName _ (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) =
 	failToParse [ tagText top, "File=" `DT.append` sourceName ] ["document not jackrose"]
@@ -98,7 +96,7 @@ maybeAttrValue :: DT.Text -> Attributes -> Maybe DT.Text
 maybeAttrValue key attrs = DM.lookup (XML.Name key Nothing Nothing) attrs
 
 
--- | Try to retrive an integer value from an attribute list.
+-- | Try to retrieve an integer value from an attribute list.
 -- Fail if the attribute doesn't exist or isn't a number representation.
 maybeIntAttrValue :: DT.Text -> Attributes -> Maybe Int
 maybeIntAttrValue key attrs = maybeAttrValue key attrs >>= reduceIt . DTR.decimal
@@ -117,17 +115,17 @@ failToParse context message = Left $ DT.concat stream where
 	stream = DL.intersperse ":" (reverse context) ++ (": " : message)
 
 
+failAllButBlank :: XMLFileContext -> DT.Text -> Either DT.Text a -> Either DT.Text a
+failAllButBlank context text allow = if DT.all DC.isSpace text then allow else failToParse context invalidItem
+
+
 -- | Parse nodes directly within the top-level @<jackrose>@ document.
 contents :: XMLFileContext -> [XML.Node] -> Logged UserSchema -> SchemaParsing
 contents _ [] schema = Right schema
 contents context (XML.NodeElement element : xs) schema = schemaItem (tagText element : context) element schema >>= contents context xs
 contents context (XML.NodeInstruction _ : xs) schema = contents context xs schema
 contents context (XML.NodeComment _ : xs) schema = contents context xs schema
-contents context (XML.NodeContent text : xs) schema =
-	if DT.all DC.isSpace text then
-		contents context xs schema
-	else
-		failToParse context invalidItem
+contents context (XML.NodeContent text : xs) schema = failAllButBlank context text (contents context xs schema)
 
 
 -- | show Element
@@ -159,22 +157,18 @@ schemaItem context (XML.Element (XML.Name "source" Nothing Nothing) attrs childr
 		>>= formDataSource
 		>>= oneSource context children schema where
 		formDataSource [uid, name, form] = DataSource.DataSource uid name <$> dataSourceVariant context form attrs
+		formDataSource _ = failToParse context invalidItem
 
-schemaItem context (XML.Element (XML.Name other _ _) _ _) _ =
-	failToParse context invalidItem
+schemaItem context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
 
 
 -- | Parse the nodes directly within a @<source>@
 oneSource :: XMLFileContext -> [XML.Node] -> Logged UserSchema -> DataSource.DataSource -> SchemaParsing
-oneSource _ [] schema source = Right schema{payload = (payload schema){sources = source : sources (payload schema)}}
+oneSource _ [] schema _ = Right schema
 oneSource context (XML.NodeElement element : xs) schema source = sourceItem (tagText element : context) element schema source >>= \sch -> oneSource context xs sch source
 oneSource context (XML.NodeInstruction _ : xs) schema source = oneSource context xs schema source
 oneSource context (XML.NodeComment _ : xs) schema source = oneSource context xs schema source
-oneSource context (XML.NodeContent text : xs) schema source =
-	if DT.all DC.isSpace text then
-		oneSource context xs schema source
-	else
-		failToParse context invalidItem
+oneSource context (XML.NodeContent text : xs) schema source = failAllButBlank context text (oneSource context xs schema source)
 
 
 -- | Parse @<tag>@s directly within a @<source>@
@@ -186,13 +180,13 @@ sourceItem _ (XML.Element (XML.Name "template" Nothing Nothing) _ _) schema _ =
 sourceItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema _ =
 	Right schema{warnings = "Unimplemented <invoke>" : warnings schema}
 
-sourceItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) (Logged w i p) source =
+sourceItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) (Logged w i (UserSchema p)) source =
 	attrList context attrs ["category"] >>= tryView where
 	tryView [category] = spliceView category <$> viewItem context (Logged w i attrs) (Nothing, Nothing) children
-	spliceView category (Logged war inf (front, back)) = Logged war inf p{views = View source category front back : views p}
+	tryView _ = failToParse context invalidItem
+	spliceView category (Logged war inf (front, back)) = Logged war inf (UserSchema (View source category front back : p))
 
-sourceItem context (XML.Element (XML.Name other _ _) _ _) _ _ =
-	failToParse context invalidItem
+sourceItem context (XML.Element (XML.Name other _ _) _ _) _ _ = failToParse context (other : ": " : invalidItem)
 
 
 type CardFaces = (Maybe [XML.Node], Maybe [XML.Node])
@@ -205,14 +199,11 @@ viewItem _ (Logged w i _) (Just frontFace, Just backFace) [] = Right $ Logged w 
 viewItem context lattrs pair (XML.NodeElement element : xs) = viewPart (tagText element : context) element pair >>= \nPair -> viewItem context lattrs nPair xs
 viewItem context lattrs pair (XML.NodeInstruction _ : xs) = viewItem context lattrs pair xs
 viewItem context lattrs pair (XML.NodeComment _ : xs) = viewItem context lattrs pair xs
-viewItem context lattrs pair (XML.NodeContent text : xs) =
-	if DT.all DC.isSpace text then
-		viewItem context lattrs pair xs
-	else
-		failToParse context invalidItem
+viewItem context lattrs pair (XML.NodeContent text : xs) = failAllButBlank context text (viewItem context lattrs pair xs)
+viewItem context _ _ [] = failToParse context invalidItem
 
 
-dupInView, extraAttributes, invalidItem :: [ DT.Text ]
+dupInView, extraAttributes, invalidItem :: [DT.Text]
 dupInView = ["duplicate in view"]
 extraAttributes = ["attributes given"]
 invalidItem = ["invalid item"]
@@ -224,14 +215,14 @@ viewPart :: XMLFileContext -> XML.Element -> CardFaces -> Either DT.Text CardFac
 viewPart context (XML.Element (XML.Name "front" Nothing Nothing) attrs children) (Nothing, back) =
 	if DM.null attrs then Right (Just children, back) else failToParse context extraAttributes
 
-viewPart context (XML.Element (XML.Name "front" Nothing Nothing) _ _) (Just _, back) = failToParse context dupInView
+viewPart context (XML.Element (XML.Name "front" Nothing Nothing) _ _) (Just _, _) = failToParse context dupInView
 
 viewPart context (XML.Element (XML.Name "back" Nothing Nothing) attrs children) (front, Nothing) =
 	if DM.null attrs then Right (front, Just children) else failToParse context extraAttributes
 
-viewPart context (XML.Element (XML.Name "back" Nothing Nothing) _ _) (Just _, back) = failToParse context dupInView
+viewPart context (XML.Element (XML.Name "back" Nothing Nothing) _ _) (Just _, _) = failToParse context dupInView
 
-viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context invalidItem
+viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
 
 
 -- | Determine data source class, specified entirely in attributes of <source>
@@ -252,6 +243,7 @@ dataSourceVariant context "CSV" attrs =
 	seeEssVee [ separator, file ]
 		| DT.length separator == 1 = Right $ DataSource.CSV '\t' file
 		| otherwise = failToParse context [ "CSV separator \"", separator, "\" must be one character" ]
+	seeEssVee _ = failToParse context invalidItem
 
 dataSourceVariant context "XML" attrs =
 	(\[ file ] -> DataSource.XMLSource file) <$> attrList context attrs [ "file" ]

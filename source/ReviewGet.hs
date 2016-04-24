@@ -36,16 +36,16 @@ getHomeR = onlyIfAuthorised review
 review :: DT.Text -> Foundation.Handler YC.Html
 review username = YC.getYesod
 		>>= YC.liftIO . readTVarIO . JRState.userConfig
-		>>= return . BZH.toHtml . maybe (errorNoUser username) (mashAround . ConfigParse.views) . DM.lookup username
+		>>= return . BZH.toHtml . maybe (errorNoUser username) mashAround . DM.lookup username
 
 
 errorNoUser :: DT.Text -> XML.Document
 errorNoUser username = mashAround' [XML.NodeContent $ DT.concat ["user \"", username, "\" dropped from state"]]
 
 
-mashAround :: [ConfigParse.View] -> XML.Document
-mashAround (ConfigParse.View _ _ obverse _ : _) = mashAround' obverse
-mashAround [] = mashAround' []
+mashAround :: ConfigParse.UserSchema -> XML.Document
+mashAround (ConfigParse.UserSchema (ConfigParse.View _ _ obverse _ : _)) = mashAround' obverse
+mashAround (ConfigParse.UserSchema []) = mashAround' []
 
 
 mashAround' :: [XML.Node] -> XML.Document
