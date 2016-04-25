@@ -15,9 +15,10 @@ debugging option is passed in.
 
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 
-module ConfigParse (UserSchema(..), SchemaParsing, View(..), Logged(..), content) where
+module ConfigParse (UserSchema(..), SchemaParsing, View(..), content) where
 
 
 import qualified Data.Text as DT (Text, concat, append, singleton, all, length)
@@ -29,6 +30,7 @@ import qualified Data.Maybe as DMy
 import qualified Data.Char as DC (isSpace)
 -- import Control.Applicative ((<$>), (<*>))
 import qualified DataSource
+import Control.Monad.Logger (LoggingT, logWarnNS, logDebugNS, logErrorNS)
 
 
 -- | Version of the configuration file schema.  This is incremented only
@@ -42,14 +44,22 @@ documentVersionText :: DT.Text
 documentVersionText = DT.singleton $ toEnum (48 + documentVersion)
 
 
-data Logged a = Logged {
-		warnings :: [DT.Text], -- ^ tell the user about these and log them.
-		info :: Maybe [DT.Text],  -- ^ just log these, if info-level requested.
-		payload :: a
-	}
+newtype ParsingResult a = ParsingResult (LoggingT IO (Either DT.Text a))
 
 
-type ParsingResult a = Either DT.Text (Logged a)
+instance Applicative ParsingResult where
+	pure = ParsingResult . return . Right
+	ParsingResult a <*> ParsingResult b = ParsingResult $ a >>= \f -> b >>= \x -> return (f <*> x)
+
+
+instance Monad ParsingResult where
+	return = ParsingResult . return . Right
+	(>>=) (ParsingResult v) f = ParsingResult (v >>= either (return . Left) richtig) where
+		richtig r = emm where (ParsingResult emm) = f r
+
+
+instance Functor ParsingResult where
+	fmap f (ParsingResult v) = ParsingResult $ fmap (fmap f) v
 
 
 type SchemaParsing = ParsingResult UserSchema
@@ -66,28 +76,38 @@ data View = View {
 	}
 
 
-data UserSchema = UserSchema [View]
+newtype UserSchema = UserSchema [View]
 
 
 type XMLFileContext = [DT.Text]
 
 
+logSource :: DT.Text
+logSource = "user-schema"
+
+
 -- | Parse the users's configuration file.  This might fail (returning a @Left DT.Text@)
 -- or succeed (returning a @Right UserSchema@).
-content :: DT.Text -> Bool -> XML.Document -> SchemaParsing
+content :: DT.Text -> XML.Document -> LoggingT IO (Either DT.Text UserSchema)
 
-content sourceName debuggery (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) =
+content sourceName doco = result where (ParsingResult result) = content' sourceName doco
+
+
+-- Internal version of the above;  no need to expose the newtype wrapper,
+-- which only exists to allow for instance declarations.
+content' :: DT.Text -> XML.Document -> SchemaParsing
+
+content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) =
 	attrList context attrs [ "version" ] >>= checkVersionAttrValue where
 		checkVersionAttrValue [version] =
 			if version == documentVersionText then
-				contents context children nullSchema
+				contents context children (UserSchema [])
 			else
 				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""]
 		checkVersionAttrValue _ = failToParse context invalidItem
 		context = [ tagText top, "File=" `DT.append` sourceName ]
-		nullSchema = Logged [] (if debuggery then Just [] else Nothing) (UserSchema [])
 
-content sourceName _ (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) =
+content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) =
 	failToParse [ tagText top, "File=" `DT.append` sourceName ] ["document not jackrose"]
 
 
@@ -110,22 +130,22 @@ reduceIt _ = Nothing
 -- | Fail to parse.  This is a quite crucial function because it returns a Left value;
 -- thus, all the @<$>@ and @>>=@ will just pass through the failure message and eventually
 -- return it to the caller.
-failToParse :: XMLFileContext -> [DT.Text] -> Either DT.Text a
-failToParse context message = Left $ DT.concat stream where
-	stream = DL.intersperse ":" (reverse context) ++ (": " : message)
+failToParse :: XMLFileContext -> [DT.Text] -> ParsingResult a
+failToParse context message = ParsingResult $ logErrorNS logSource stream >> (return $ Left $ DT.concat message) where
+	stream = DT.concat $ DL.intersperse ":" (reverse context) ++ (": " : message)
 
 
-failAllButBlank :: XMLFileContext -> DT.Text -> Either DT.Text a -> Either DT.Text a
-failAllButBlank context text allow = if DT.all DC.isSpace text then allow else failToParse context invalidItem
+failAllButBlank :: XMLFileContext -> DT.Text -> a -> ParsingResult a
+failAllButBlank context text allow = if DT.all DC.isSpace text then return allow else failToParse context invalidItem
 
 
 -- | Parse nodes directly within the top-level @<jackrose>@ document.
-contents :: XMLFileContext -> [XML.Node] -> Logged UserSchema -> SchemaParsing
-contents _ [] schema = Right schema
-contents context (XML.NodeElement element : xs) schema = schemaItem (tagText element : context) element schema >>= contents context xs
-contents context (XML.NodeInstruction _ : xs) schema = contents context xs schema
-contents context (XML.NodeComment _ : xs) schema = contents context xs schema
-contents context (XML.NodeContent text : xs) schema = failAllButBlank context text (contents context xs schema)
+contents :: XMLFileContext -> [XML.Node] -> UserSchema -> SchemaParsing
+contents _ [] win = return win
+contents context (XML.NodeElement element : xs) win = schemaItem (tagText element : context) element win >>= contents context xs
+contents context (XML.NodeInstruction _ : xs) win = contents context xs win
+contents context (XML.NodeComment _ : xs) win = contents context xs win
+contents context (XML.NodeContent text : xs) win = contents context xs win >>= failAllButBlank context text
 
 
 -- | show Element
@@ -145,46 +165,46 @@ qualiform (Just repr) = repr `DT.append` ":"
 
 
 -- | Parse @<tag>@s directly within the top-level @<jackrose>@ document.
-schemaItem :: XMLFileContext -> XML.Element -> Logged UserSchema -> SchemaParsing
+schemaItem :: XMLFileContext -> XML.Element -> UserSchema -> SchemaParsing
 
 schemaItem _ (XML.Element (XML.Name "frontispiece" Nothing Nothing) _ _) schema =
-	Right schema{warnings = "Unimplemented <frontispiece>" : warnings schema}
+	ParsingResult $ logWarnNS logSource "Unimplemented <frontispiece>"  >> (return $ Right schema)
 
 -- | @<source UID="GreekG" name="Greek Grammar" form="Postgres" server="localhost" port="9010" database="learning" namespace="all" table="GreekGrammar">@
 -- Pick out the attributes to work out what class of data source then pass on to <view> etc. parsing
 schemaItem context (XML.Element (XML.Name "source" Nothing Nothing) attrs children) schema =
-	attrList context attrs ["UID", "name", "form"]
-		>>= formDataSource
+	(attrList context attrs ["UID", "name", "form"]
+		>>= formDataSource)
 		>>= oneSource context children schema where
-		formDataSource [uid, name, form] = DataSource.DataSource uid name <$> dataSourceVariant context form attrs
+		formDataSource [uid, name, form] = dataSourceVariant context form attrs >>= (\zee -> return $ DataSource.DataSource uid name zee)
 		formDataSource _ = failToParse context invalidItem
 
 schemaItem context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
 
 
 -- | Parse the nodes directly within a @<source>@
-oneSource :: XMLFileContext -> [XML.Node] -> Logged UserSchema -> DataSource.DataSource -> SchemaParsing
-oneSource _ [] schema _ = Right schema
+oneSource :: XMLFileContext -> [XML.Node] -> UserSchema -> DataSource.DataSource -> SchemaParsing
+oneSource _ [] schema _ = return schema
 oneSource context (XML.NodeElement element : xs) schema source = sourceItem (tagText element : context) element schema source >>= \sch -> oneSource context xs sch source
 oneSource context (XML.NodeInstruction _ : xs) schema source = oneSource context xs schema source
 oneSource context (XML.NodeComment _ : xs) schema source = oneSource context xs schema source
-oneSource context (XML.NodeContent text : xs) schema source = failAllButBlank context text (oneSource context xs schema source)
+oneSource context (XML.NodeContent text : xs) schema source = oneSource context xs schema source >>= failAllButBlank context text
 
 
 -- | Parse @<tag>@s directly within a @<source>@
-sourceItem :: XMLFileContext -> XML.Element -> Logged UserSchema -> DataSource.DataSource -> SchemaParsing
+sourceItem :: XMLFileContext -> XML.Element -> UserSchema -> DataSource.DataSource -> SchemaParsing
 
 sourceItem _ (XML.Element (XML.Name "template" Nothing Nothing) _ _) schema _ =
-	Right schema{warnings = "Unimplemented <template>" : warnings schema}
+	ParsingResult $ logWarnNS logSource "Unimplemented <template>"  >> (return $ Right schema)
 
 sourceItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema _ =
-	Right schema{warnings = "Unimplemented <invoke>" : warnings schema}
+	ParsingResult $ logWarnNS logSource "Unimplemented <invoke>"  >> (return $ Right schema)
 
-sourceItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) (Logged w i (UserSchema p)) source =
+sourceItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) (UserSchema p) source =
 	attrList context attrs ["category"] >>= tryView where
-	tryView [category] = spliceView category <$> viewItem context (Logged w i attrs) (Nothing, Nothing) children
+	tryView [category] = spliceView category `fmap` viewItem context attrs (Nothing, Nothing) children
 	tryView _ = failToParse context invalidItem
-	spliceView category (Logged war inf (front, back)) = Logged war inf (UserSchema (View source category front back : p))
+	spliceView category (front, back) = UserSchema (View source category front back : p)
 
 sourceItem context (XML.Element (XML.Name other _ _) _ _) _ _ = failToParse context (other : ": " : invalidItem)
 
@@ -193,13 +213,13 @@ type CardFaces = (Maybe [XML.Node], Maybe [XML.Node])
 
 
 -- | Parse nodes within a @<view>@
-viewItem :: XMLFileContext -> Logged Attributes -> CardFaces -> [XML.Node] -> ParsingResult ([XML.Node], [XML.Node])
+viewItem :: XMLFileContext -> Attributes -> CardFaces -> [XML.Node] -> ParsingResult ([XML.Node], [XML.Node])
 
-viewItem _ (Logged w i _) (Just frontFace, Just backFace) [] = Right $ Logged w i (frontFace, backFace)
+viewItem _ _ (Just frontFace, Just backFace) [] = return (frontFace, backFace)
 viewItem context lattrs pair (XML.NodeElement element : xs) = viewPart (tagText element : context) element pair >>= \nPair -> viewItem context lattrs nPair xs
 viewItem context lattrs pair (XML.NodeInstruction _ : xs) = viewItem context lattrs pair xs
 viewItem context lattrs pair (XML.NodeComment _ : xs) = viewItem context lattrs pair xs
-viewItem context lattrs pair (XML.NodeContent text : xs) = failAllButBlank context text (viewItem context lattrs pair xs)
+viewItem context lattrs pair (XML.NodeContent text : xs) = viewItem context lattrs pair xs >>= failAllButBlank context text
 viewItem context _ _ [] = failToParse context invalidItem
 
 
@@ -210,15 +230,15 @@ invalidItem = ["invalid item"]
 
 
 -- | Parse @<tag>@s within a @<view>@;  there should be just one each of @<front>@ and @<back>@
-viewPart :: XMLFileContext -> XML.Element -> CardFaces -> Either DT.Text CardFaces
+viewPart :: XMLFileContext -> XML.Element -> CardFaces -> ParsingResult CardFaces
 
 viewPart context (XML.Element (XML.Name "front" Nothing Nothing) attrs children) (Nothing, back) =
-	if DM.null attrs then Right (Just children, back) else failToParse context extraAttributes
+	if DM.null attrs then return (Just children, back) else failToParse context extraAttributes
 
 viewPart context (XML.Element (XML.Name "front" Nothing Nothing) _ _) (Just _, _) = failToParse context dupInView
 
 viewPart context (XML.Element (XML.Name "back" Nothing Nothing) attrs children) (front, Nothing) =
-	if DM.null attrs then Right (front, Just children) else failToParse context extraAttributes
+	if DM.null attrs then return (front, Just children) else failToParse context extraAttributes
 
 viewPart context (XML.Element (XML.Name "back" Nothing Nothing) _ _) (Just _, _) = failToParse context dupInView
 
@@ -226,27 +246,27 @@ viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context 
 
 
 -- | Determine data source class, specified entirely in attributes of <source>
-dataSourceVariant :: XMLFileContext -> DT.Text -> Attributes -> Either DT.Text DataSource.DataVariant
+dataSourceVariant :: XMLFileContext -> DT.Text -> Attributes -> ParsingResult DataSource.DataVariant
 
 dataSourceVariant context "Postgres" attrs =
-	(\[thisServer, thisDatabase, thisTable] -> DataSource.Postgres thisServer portNo thisDatabase nameSpace thisTable thisUser thisPass) <$> attrList context attrs [ "server", "database", "table" ] where
+	(\[thisServer, thisDatabase, thisTable] -> DataSource.Postgres thisServer portNo thisDatabase nameSpace thisTable thisUser thisPass) `fmap` attrList context attrs [ "server", "database", "table" ] where
 	portNo = maybeIntAttrValue "port" attrs
 	nameSpace = maybeAttrValue "namespace" attrs
 	thisUser = maybeAttrValue "username" attrs
 	thisPass = maybeAttrValue "password" attrs
 
 dataSourceVariant context "SQLite3" attrs =
-	(\[ fileName ] -> DataSource.Sqlite3 fileName) <$> attrList context attrs [ "filename" ]
+	(\[ fileName ] -> DataSource.Sqlite3 fileName) `fmap` attrList context attrs [ "filename" ]
 
 dataSourceVariant context "CSV" attrs =
 	attrList context attrs [ "separator", "file" ] >>= seeEssVee where
 	seeEssVee [ separator, file ]
-		| DT.length separator == 1 = Right $ DataSource.CSV '\t' file
+		| DT.length separator == 1 = return $ DataSource.CSV '\t' file		-- TODO first character
 		| otherwise = failToParse context [ "CSV separator \"", separator, "\" must be one character" ]
 	seeEssVee _ = failToParse context invalidItem
 
 dataSourceVariant context "XML" attrs =
-	(\[ file ] -> DataSource.XMLSource file) <$> attrList context attrs [ "file" ]
+	(\[ file ] -> DataSource.XMLSource file) `fmap` attrList context attrs [ "file" ]
 
 dataSourceVariant context form _ = failToParse context ["Invalid form \"", form, "\""]
 
@@ -254,13 +274,13 @@ dataSourceVariant context form _ = failToParse context ["Invalid form \"", form,
 -- | given a list of attributes, and a list of attribute names, return either:
 -- | * @Left "missing attribute"@
 -- | * @Right $ list of attribute values@
-attrList :: XMLFileContext -> Attributes -> [DT.Text] -> Either DT.Text [DT.Text]
+attrList :: XMLFileContext -> Attributes -> [DT.Text] -> ParsingResult [DT.Text]
 
-attrList _ _ [] = Right []
+attrList _ _ [] = return []
 
 attrList context attrs (attr : rest) =
 	DMy.maybe
 		(failToParse context ["missing attribute ", attr])
 		mumble
 		(maybeAttrValue attr attrs) where
-		mumble value = (value :) <$> attrList context attrs rest
+		mumble value = attrList context attrs rest >>= (\e -> ParsingResult $ logDebugNS logSource (DT.concat ["attribute: ", attr, "=\"", value, "\""])  >> (return $ Right (value : e)))
