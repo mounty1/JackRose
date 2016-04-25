@@ -21,7 +21,7 @@ debugging option is passed in.
 module ConfigParse (UserSchema(..), SchemaParsing, View(..), content) where
 
 
-import qualified Data.Text as DT (Text, concat, append, singleton, all, length)
+import qualified Data.Text as DT (Text, concat, append, singleton, all, length, head)
 import qualified Data.Text.Read as DTR (decimal)
 import qualified Data.List as DL (intersperse)
 import qualified Text.XML as XML
@@ -94,7 +94,7 @@ content sourceName doco = result where (ParsingResult result) = content' sourceN
 
 
 -- Internal version of the above;  no need to expose the newtype wrapper,
--- which only exists to allow for instance declarations.
+-- which exists only to allow for instance declarations.
 content' :: DT.Text -> XML.Document -> SchemaParsing
 
 content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) =
@@ -173,8 +173,8 @@ schemaItem _ (XML.Element (XML.Name "frontispiece" Nothing Nothing) _ _) schema 
 -- | @<source UID="GreekG" name="Greek Grammar" form="Postgres" server="localhost" port="9010" database="learning" namespace="all" table="GreekGrammar">@
 -- Pick out the attributes to work out what class of data source then pass on to <view> etc. parsing
 schemaItem context (XML.Element (XML.Name "source" Nothing Nothing) attrs children) schema =
-	(attrList context attrs ["UID", "name", "form"]
-		>>= formDataSource)
+	attrList context attrs ["UID", "name", "form"]
+		>>= formDataSource
 		>>= oneSource context children schema where
 		formDataSource [uid, name, form] = dataSourceVariant context form attrs >>= (\zee -> return $ DataSource.DataSource uid name zee)
 		formDataSource _ = failToParse context invalidItem
@@ -261,7 +261,7 @@ dataSourceVariant context "SQLite3" attrs =
 dataSourceVariant context "CSV" attrs =
 	attrList context attrs [ "separator", "file" ] >>= seeEssVee where
 	seeEssVee [ separator, file ]
-		| DT.length separator == 1 = return $ DataSource.CSV '\t' file		-- TODO first character
+		| DT.length separator == 1 = return $ DataSource.CSV (DT.head separator) file
 		| otherwise = failToParse context [ "CSV separator \"", separator, "\" must be one character" ]
 	seeEssVee _ = failToParse context invalidItem
 
