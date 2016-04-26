@@ -49,12 +49,12 @@ newtype ParsingResult a = ParsingResult (LoggingT IO (Either DT.Text a))
 
 instance Applicative ParsingResult where
 	pure = ParsingResult . return . Right
-	ParsingResult a <*> ParsingResult b = ParsingResult $ a >>= \f -> b >>= \x -> return (f <*> x)
+	ParsingResult a <*> ParsingResult b = ParsingResult $ a >>= (\f -> b >>= return . (<*>) f)
 
 
 instance Monad ParsingResult where
 	return = ParsingResult . return . Right
-	(>>=) (ParsingResult v) f = ParsingResult (v >>= either (return . Left) richtig) where
+	ParsingResult v >>= f = ParsingResult $ v >>= either (return . Left) richtig where
 		richtig r = emm where (ParsingResult emm) = f r
 
 
@@ -98,12 +98,12 @@ content sourceName doco = result where (ParsingResult result) = content' sourceN
 content' :: DT.Text -> XML.Document -> SchemaParsing
 
 content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) =
-	attrList context attrs ["version"] [] >>= checkVersionAttrValue where
-		checkVersionAttrValue ([version], []) =
+	attrList context attrs ["version"] []
+		>>= \([version], []) ->
 			if version == documentVersionText then
 				contents context children (UserSchema [])
 			else
-				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""]
+				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""] where
 		context = [ tagText top, "File=" `DT.append` sourceName ]
 
 content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) =
@@ -248,10 +248,12 @@ dataSourceVariant context "SQLite3" attrs =
 	(\([fileName], []) -> DataSource.Sqlite3 fileName) `fmap` attrList context attrs ["filename"] []
 
 dataSourceVariant context "CSV" attrs =
-	attrList context attrs ["separator", "file"] [] >>= seeEssVee where
-	seeEssVee ([separator, file], [])
-		| DT.length separator == 1 = return $ DataSource.CSV (DT.head separator) file
-		| otherwise = failToParse context [ "CSV separator \"", separator, "\" must be one character" ]
+	attrList context attrs ["separator", "file"] []
+		>>= \([separator, file], []) ->
+			if DT.length separator == 1 then
+				return $ DataSource.CSV (DT.head separator) file
+			else
+				failToParse context [ "CSV separator \"", separator, "\" must be one character" ]
 
 dataSourceVariant context "XML" attrs =
 	(\([file], []) -> DataSource.XMLSource file) `fmap` attrList context attrs ["file"] []
