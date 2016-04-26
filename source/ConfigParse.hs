@@ -22,13 +22,14 @@ module ConfigParse (UserSchema(..), SchemaParsing, View(..), content) where
 
 import qualified Data.Text as DT (Text, concat, append, singleton, all, length, head)
 import qualified Data.Text.Read as DTR (decimal)
-import qualified Data.List as DL (intersperse, null)
+import qualified Data.List as DL (intersperse, null, (\\))
 import qualified Text.XML as XML
 import qualified Data.Map as DM
-import qualified Data.Maybe as DMy
 import qualified Data.Char as DC (isSpace)
 -- import Control.Applicative ((<$>), (<*>))
 import qualified DataSource
+import Data.Maybe (fromJust)
+import Data.Either (partitionEithers)
 import Control.Monad.Logger (LoggingT, logWarnNS, logDebugNS, logErrorNS)
 
 
@@ -97,8 +98,8 @@ content sourceName doco = result where (ParsingResult result) = content' sourceN
 content' :: DT.Text -> XML.Document -> SchemaParsing
 
 content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) =
-	attrList context attrs [ "version" ] >>= checkVersionAttrValue where
-		checkVersionAttrValue [version] =
+	attrList context attrs ["version"] [] >>= checkVersionAttrValue where
+		checkVersionAttrValue ([version], []) =
 			if version == documentVersionText then
 				contents context children (UserSchema [])
 			else
@@ -109,15 +110,10 @@ content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) =
 	failToParse [ tagText top, "File=" `DT.append` sourceName ] ["document not jackrose"]
 
 
--- Try to retrieve an attribute value from a list.
-maybeAttrValue :: DT.Text -> Attributes -> Maybe DT.Text
-maybeAttrValue key attrs = DM.lookup (XML.Name key Nothing Nothing) attrs
-
-
--- Try to retrieve an integer value from an attribute list.
--- Fail if the attribute doesn't exist or isn't a number representation.
-maybeIntAttrValue :: DT.Text -> Attributes -> Maybe Int
-maybeIntAttrValue key attrs = maybeAttrValue key attrs >>= reduceIt . DTR.decimal
+-- Try to convert an attribute value to an integer;
+-- the attribute may not exist or may not be a number representation.
+maybeIntAttrValue :: DT.Text -> Maybe Int
+maybeIntAttrValue = reduceIt . DTR.decimal
 
 
 reduceIt :: Either String (Int, DT.Text) -> Maybe Int
@@ -171,10 +167,9 @@ schemaItem _ (XML.Element (XML.Name "frontispiece" Nothing Nothing) _ _) schema 
 -- @<source UID="GreekG" name="Greek Grammar" form="Postgres" server="localhost" port="9010" database="learning" namespace="all" table="GreekGrammar">@
 -- Pick out the attributes to work out what class of data source then pass on to <view> etc. parsing
 schemaItem context (XML.Element (XML.Name "source" Nothing Nothing) attrs children) schema =
-	attrList context attrs ["UID", "name", "form"]
-		>>= formDataSource
+	attrList context attrs ["UID", "name", "form"] []
+		>>= (\([uid, name, form], []) -> dataSourceVariant context form attrs >>= (\zee -> return $ DataSource.DataSource uid name zee))
 		>>= oneSource context children schema where
-		formDataSource [uid, name, form] = dataSourceVariant context form attrs >>= (\zee -> return $ DataSource.DataSource uid name zee)
 
 schemaItem context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
 
@@ -198,8 +193,8 @@ sourceItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema _ =
 	ParsingResult $ logWarnNS logSource "Unimplemented <invoke>"  >> (return $ Right schema)
 
 sourceItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) (UserSchema p) source =
-	attrList context attrs ["category"] >>= tryView where
-	tryView [category] = spliceView category `fmap` viewItem context attrs (Nothing, Nothing) children
+	attrList context attrs ["category"] []
+		>>= \([category], []) -> spliceView category `fmap` viewItem context attrs (Nothing, Nothing) children where
 	spliceView category (front, back) = UserSchema (View source category front back : p)
 
 sourceItem context (XML.Element (XML.Name other _ _) _ _) _ _ = failToParse context (other : ": " : invalidItem)
@@ -245,23 +240,21 @@ viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context 
 dataSourceVariant :: XMLFileContext -> DT.Text -> Attributes -> ParsingResult DataSource.DataVariant
 
 dataSourceVariant context "Postgres" attrs =
-	(\[thisServer, thisDatabase, thisTable] -> DataSource.Postgres thisServer portNo thisDatabase nameSpace thisTable thisUser thisPass) `fmap` attrList context attrs [ "server", "database", "table" ] where
-	portNo = maybeIntAttrValue "port" attrs
-	nameSpace = maybeAttrValue "namespace" attrs
-	thisUser = maybeAttrValue "username" attrs
-	thisPass = maybeAttrValue "password" attrs
+	(\([thisServer, thisDatabase, thisTable], [portRepr, nameSpace, thisUser, thisPass]) ->
+			DataSource.Postgres thisServer (portRepr >>= maybeIntAttrValue) thisDatabase nameSpace thisTable thisUser thisPass) `fmap`
+		attrList context attrs [ "server", "database", "table" ] ["port", "namespace", "username", "password"]
 
 dataSourceVariant context "SQLite3" attrs =
-	(\[ fileName ] -> DataSource.Sqlite3 fileName) `fmap` attrList context attrs [ "filename" ]
+	(\([fileName], []) -> DataSource.Sqlite3 fileName) `fmap` attrList context attrs ["filename"] []
 
 dataSourceVariant context "CSV" attrs =
-	attrList context attrs [ "separator", "file" ] >>= seeEssVee where
-	seeEssVee [ separator, file ]
+	attrList context attrs ["separator", "file"] [] >>= seeEssVee where
+	seeEssVee ([separator, file], [])
 		| DT.length separator == 1 = return $ DataSource.CSV (DT.head separator) file
 		| otherwise = failToParse context [ "CSV separator \"", separator, "\" must be one character" ]
 
 dataSourceVariant context "XML" attrs =
-	(\[ file ] -> DataSource.XMLSource file) `fmap` attrList context attrs [ "file" ]
+	(\([file], []) -> DataSource.XMLSource file) `fmap` attrList context attrs ["file"] []
 
 dataSourceVariant context form _ = failToParse context ["Invalid form \"", form, "\""]
 
@@ -269,13 +262,33 @@ dataSourceVariant context form _ = failToParse context ["Invalid form \"", form,
 -- given a list of attributes, and a list of attribute names, return either:
 -- * @Left "missing attribute"@
 -- * @Right $ list of attribute values@
-attrList :: XMLFileContext -> Attributes -> [DT.Text] -> ParsingResult [DT.Text]
+attrList :: XMLFileContext -> Attributes -> [DT.Text] -> [DT.Text] -> ParsingResult ([DT.Text], [Maybe DT.Text])
 
-attrList _ _ [] = return []
+attrList context attrMap attrRequired attrOptional =
+	if DL.null missingRequired then
+		ParsingResult
+			-- this first zip only works when all required key values are found
+			$ mapM_ (logDebugNS logSource . mkAttrDebugPair) (zip attrRequired foundRequired)
+			>> mapM_ (logDebugNS logSource . mkOptAttrDebugPair) (zip attrOptional foundOptional)
+			>> mapM_ (logWarnNS logSource . mkStrayAttrPair) strayKeys
+			>> (return $ Right (foundRequired, foundOptional))
+	else
+		failToParse context ("missing attribute(s): " : DL.intersperse "," missingRequired) where
+	foundOptional = map maybeAttrValue attrOptional
+	lookupOneAttr attr = maybe (Left attr) Right $ maybeAttrValue attr
+	(missingRequired, foundRequired) = partitionEithers $ map lookupOneAttr attrRequired
+	strayKeys = (map (\(XML.Name name Nothing Nothing) -> name) (DM.keys attrMap) DL.\\ attrRequired) DL.\\ attrOptional
+	mkStrayAttrPair key = DT.concat ["unused attribute: ", key, "=\"", fromJust (maybeAttrValue key), "\""]
 
-attrList context attrs (attr : rest) =
-	DMy.maybe
-		(failToParse context ["missing attribute ", attr])
-		mumble
-		(maybeAttrValue attr attrs) where
-		mumble value = attrList context attrs rest >>= (\e -> ParsingResult $ logDebugNS logSource (DT.concat ["attribute: ", attr, "=\"", value, "\""])  >> (return $ Right (value : e)))
+	-- Try to retrieve an attribute value from a list.
+	maybeAttrValue :: DT.Text -> Maybe DT.Text
+	maybeAttrValue key = DM.lookup (XML.Name key Nothing Nothing) attrMap
+
+
+mkAttrDebugPair :: (DT.Text, DT.Text) -> DT.Text
+mkAttrDebugPair (key, value) = DT.concat ["attribute: ", key, "=\"", value, "\""]
+
+
+mkOptAttrDebugPair :: (DT.Text, Maybe DT.Text) -> DT.Text
+mkOptAttrDebugPair (key, Nothing) = DT.concat ["attribute: ", key, " not found"]
+mkOptAttrDebugPair (key, Just value) = mkAttrDebugPair (key, value)
