@@ -20,12 +20,12 @@ import qualified CommandArgs (CmdLineArgs(..))
 import qualified Data.ConfigFile as DC
 import qualified Data.Maybe as DMy
 import qualified AuthoriStyle (Style(..))
-import qualified JRState (JRState(..), debugging, UserConfig)
+import qualified JRState (JRState(..), UserConfig)
 import qualified Data.Map as DM (empty)
 import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool, ConnectionPool)
 import Control.Concurrent.STM (newTVar)
 import Control.Monad.STM (atomically)
-import Control.Monad.Logger (LogLevel(..), logInfoNS, logWarnNS, logErrorNS)
+import Control.Monad.Logger (LogLevel(..), logDebugNS, logWarnNS, logErrorNS)
 import Control.Monad.Error.Class (catchError)
 import LogFilter (runFilteredLoggingT)
 
@@ -68,7 +68,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= configurationData where
 		spliceShared :: Show l => ([DT.Text], JRState.UserConfig -> JRState.JRState) -> Either l [String] -> IO JRState.JRState
 		spliceShared (labels, fn) keysE = runFilteredLoggingT verbosity (either munchErr munchKeys keysE) >> (return site) where
 			munchErr = logErrorNS configLogName . DT.pack . show
-			munchKeys keys = (if JRState.debugging site then (>>) (mapM_ (logInfoNS configLogName . makeUnseenKeyMsg) (labels \\ keysInConfig)) else id) (mapM_ (logWarnNS configLogName . makeUnknownKeyMsg) (keysInConfig \\ labels)) where
+			munchKeys keys = mapM_ (logDebugNS configLogName . makeUnseenKeyMsg) (labels \\ keysInConfig) >> mapM_ (logWarnNS configLogName . makeUnknownKeyMsg) (keysInConfig \\ labels) where
 				keysInConfig = map DT.pack keys
 			site = fn sharedData
 

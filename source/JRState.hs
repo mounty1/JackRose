@@ -17,7 +17,7 @@ import Data.Text (Text)
 import ConfigParse (UserSchema)
 import Data.Map (Map)
 import Control.Concurrent.STM (TVar)
-import Control.Monad.Logger (LoggingT, LogLevel(LevelDebug))
+import Control.Monad.Logger (LoggingT, LogLevel)
 import Control.Monad.IO.Class (MonadIO)
 import LogFilter (runFilteredLoggingT)
 
@@ -51,9 +51,6 @@ data JRState = JRState {
 			-- ^ not sure and makes no sense now
 		userConfig :: UserConfig
 	}
-
-debugging :: JRState -> Bool
-debugging site = LevelDebug == logLevel site
 
 
 runFilteredLoggingT :: MonadIO m => JRState -> LoggingT m a -> m a
