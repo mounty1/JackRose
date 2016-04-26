@@ -8,14 +8,13 @@ Portability: undefined
 
 Take the users's configuration file and pick out the data sources and other information.
 If an unrecoverable error occurs, return a text diagnostic in the Left constructor;
-otherwise, return an object of the schema data, with a list of warnings and a list of
-informational messages.  The informational messages include debugging messages if the
-debugging option is passed in.
+otherwise, return an object of the schema data.  Since the code is within the
+@LoggingT IO@ monad, there are full diagnostics etc. output.  As soon as an error be
+encountered, the definition of our monad means that evaluation backs out immediately.
 -}
 
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 
 module ConfigParse (UserSchema(..), SchemaParsing, View(..), content) where
@@ -23,7 +22,7 @@ module ConfigParse (UserSchema(..), SchemaParsing, View(..), content) where
 
 import qualified Data.Text as DT (Text, concat, append, singleton, all, length, head)
 import qualified Data.Text.Read as DTR (decimal)
-import qualified Data.List as DL (intersperse)
+import qualified Data.List as DL (intersperse, null)
 import qualified Text.XML as XML
 import qualified Data.Map as DM
 import qualified Data.Maybe as DMy
@@ -39,7 +38,7 @@ documentVersion :: Int
 documentVersion = 1
 
 
--- | Textual representation of schema version number.
+-- Textual representation of schema version number.
 documentVersionText :: DT.Text
 documentVersionText = DT.singleton $ toEnum (48 + documentVersion)
 
@@ -87,7 +86,7 @@ logSource = "user-schema"
 
 
 -- | Parse the users's configuration file.  This might fail (returning a @Left DT.Text@)
--- or succeed (returning a @Right UserSchema@).
+-- | or succeed (returning a @Right UserSchema@).
 content :: DT.Text -> XML.Document -> LoggingT IO (Either DT.Text UserSchema)
 
 content sourceName doco = result where (ParsingResult result) = content' sourceName doco
@@ -104,19 +103,18 @@ content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothin
 				contents context children (UserSchema [])
 			else
 				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""]
-		checkVersionAttrValue _ = failToParse context invalidItem
 		context = [ tagText top, "File=" `DT.append` sourceName ]
 
 content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) =
 	failToParse [ tagText top, "File=" `DT.append` sourceName ] ["document not jackrose"]
 
 
--- | Try to retrieve an attribute value from a list.
+-- Try to retrieve an attribute value from a list.
 maybeAttrValue :: DT.Text -> Attributes -> Maybe DT.Text
 maybeAttrValue key attrs = DM.lookup (XML.Name key Nothing Nothing) attrs
 
 
--- | Try to retrieve an integer value from an attribute list.
+-- Try to retrieve an integer value from an attribute list.
 -- Fail if the attribute doesn't exist or isn't a number representation.
 maybeIntAttrValue :: DT.Text -> Attributes -> Maybe Int
 maybeIntAttrValue key attrs = maybeAttrValue key attrs >>= reduceIt . DTR.decimal
@@ -127,7 +125,7 @@ reduceIt (Right (n, "")) = Just n
 reduceIt _ = Nothing
 
 
--- | Fail to parse.  This is a quite crucial function because it returns a Left value;
+-- Fail to parse.  This is a quite crucial function because it returns a Left value;
 -- thus, all the @<$>@ and @>>=@ will just pass through the failure message and eventually
 -- return it to the caller.
 failToParse :: XMLFileContext -> [DT.Text] -> ParsingResult a
@@ -139,7 +137,7 @@ failAllButBlank :: XMLFileContext -> DT.Text -> a -> ParsingResult a
 failAllButBlank context text allow = if DT.all DC.isSpace text then return allow else failToParse context invalidItem
 
 
--- | Parse nodes directly within the top-level @<jackrose>@ document.
+-- Parse nodes directly within the top-level @<jackrose>@ document.
 contents :: XMLFileContext -> [XML.Node] -> UserSchema -> SchemaParsing
 contents _ [] win = return win
 contents context (XML.NodeElement element : xs) win = schemaItem (tagText element : context) element win >>= contents context xs
@@ -148,12 +146,12 @@ contents context (XML.NodeComment _ : xs) win = contents context xs win
 contents context (XML.NodeContent text : xs) win = contents context xs win >>= failAllButBlank context text
 
 
--- | show Element
+-- show Element
 tagText :: XML.Element -> DT.Text
 tagText (XML.Element (XML.Name plainName namespace prefix) attrs _) = DT.concat $ ["<", qualiform namespace, qualiform prefix, plainName] ++ map attrForm (DM.toList attrs) ++ [">"]
 
 
--- | show attribute+value pair
+-- show attribute+value pair
 attrForm :: (XML.Name, DT.Text) -> DT.Text
 attrForm (XML.Name plainName namespace prefix, attrValue) = DT.concat [" ", qualiform namespace, qualiform prefix, plainName, "=\"", attrValue, "\""]
 
@@ -164,25 +162,24 @@ qualiform Nothing = ""
 qualiform (Just repr) = repr `DT.append` ":"
 
 
--- | Parse @<tag>@s directly within the top-level @<jackrose>@ document.
+-- Parse @<tag>@s directly within the top-level @<jackrose>@ document.
 schemaItem :: XMLFileContext -> XML.Element -> UserSchema -> SchemaParsing
 
 schemaItem _ (XML.Element (XML.Name "frontispiece" Nothing Nothing) _ _) schema =
 	ParsingResult $ logWarnNS logSource "Unimplemented <frontispiece>"  >> (return $ Right schema)
 
--- | @<source UID="GreekG" name="Greek Grammar" form="Postgres" server="localhost" port="9010" database="learning" namespace="all" table="GreekGrammar">@
+-- @<source UID="GreekG" name="Greek Grammar" form="Postgres" server="localhost" port="9010" database="learning" namespace="all" table="GreekGrammar">@
 -- Pick out the attributes to work out what class of data source then pass on to <view> etc. parsing
 schemaItem context (XML.Element (XML.Name "source" Nothing Nothing) attrs children) schema =
 	attrList context attrs ["UID", "name", "form"]
 		>>= formDataSource
 		>>= oneSource context children schema where
 		formDataSource [uid, name, form] = dataSourceVariant context form attrs >>= (\zee -> return $ DataSource.DataSource uid name zee)
-		formDataSource _ = failToParse context invalidItem
 
 schemaItem context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
 
 
--- | Parse the nodes directly within a @<source>@
+-- Parse the nodes directly within a @<source>@
 oneSource :: XMLFileContext -> [XML.Node] -> UserSchema -> DataSource.DataSource -> SchemaParsing
 oneSource _ [] schema _ = return schema
 oneSource context (XML.NodeElement element : xs) schema source = sourceItem (tagText element : context) element schema source >>= \sch -> oneSource context xs sch source
@@ -191,7 +188,7 @@ oneSource context (XML.NodeComment _ : xs) schema source = oneSource context xs 
 oneSource context (XML.NodeContent text : xs) schema source = oneSource context xs schema source >>= failAllButBlank context text
 
 
--- | Parse @<tag>@s directly within a @<source>@
+-- Parse @<tag>@s directly within a @<source>@
 sourceItem :: XMLFileContext -> XML.Element -> UserSchema -> DataSource.DataSource -> SchemaParsing
 
 sourceItem _ (XML.Element (XML.Name "template" Nothing Nothing) _ _) schema _ =
@@ -203,7 +200,6 @@ sourceItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema _ =
 sourceItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) (UserSchema p) source =
 	attrList context attrs ["category"] >>= tryView where
 	tryView [category] = spliceView category `fmap` viewItem context attrs (Nothing, Nothing) children
-	tryView _ = failToParse context invalidItem
 	spliceView category (front, back) = UserSchema (View source category front back : p)
 
 sourceItem context (XML.Element (XML.Name other _ _) _ _) _ _ = failToParse context (other : ": " : invalidItem)
@@ -212,7 +208,7 @@ sourceItem context (XML.Element (XML.Name other _ _) _ _) _ _ = failToParse cont
 type CardFaces = (Maybe [XML.Node], Maybe [XML.Node])
 
 
--- | Parse nodes within a @<view>@
+-- Parse nodes within a @<view>@
 viewItem :: XMLFileContext -> Attributes -> CardFaces -> [XML.Node] -> ParsingResult ([XML.Node], [XML.Node])
 
 viewItem _ _ (Just frontFace, Just backFace) [] = return (frontFace, backFace)
@@ -229,7 +225,7 @@ extraAttributes = ["attributes given"]
 invalidItem = ["invalid item"]
 
 
--- | Parse @<tag>@s within a @<view>@;  there should be just one each of @<front>@ and @<back>@
+-- Parse @<tag>@s within a @<view>@;  there should be just one each of @<front>@ and @<back>@
 viewPart :: XMLFileContext -> XML.Element -> CardFaces -> ParsingResult CardFaces
 
 viewPart context (XML.Element (XML.Name "front" Nothing Nothing) attrs children) (Nothing, back) =
@@ -245,7 +241,7 @@ viewPart context (XML.Element (XML.Name "back" Nothing Nothing) _ _) (Just _, _)
 viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
 
 
--- | Determine data source class, specified entirely in attributes of <source>
+-- Determine data source class, specified entirely in attributes of <source>
 dataSourceVariant :: XMLFileContext -> DT.Text -> Attributes -> ParsingResult DataSource.DataVariant
 
 dataSourceVariant context "Postgres" attrs =
@@ -263,7 +259,6 @@ dataSourceVariant context "CSV" attrs =
 	seeEssVee [ separator, file ]
 		| DT.length separator == 1 = return $ DataSource.CSV (DT.head separator) file
 		| otherwise = failToParse context [ "CSV separator \"", separator, "\" must be one character" ]
-	seeEssVee _ = failToParse context invalidItem
 
 dataSourceVariant context "XML" attrs =
 	(\[ file ] -> DataSource.XMLSource file) `fmap` attrList context attrs [ "file" ]
@@ -271,9 +266,9 @@ dataSourceVariant context "XML" attrs =
 dataSourceVariant context form _ = failToParse context ["Invalid form \"", form, "\""]
 
 
--- | given a list of attributes, and a list of attribute names, return either:
--- | * @Left "missing attribute"@
--- | * @Right $ list of attribute values@
+-- given a list of attributes, and a list of attribute names, return either:
+-- * @Left "missing attribute"@
+-- * @Right $ list of attribute values@
 attrList :: XMLFileContext -> Attributes -> [DT.Text] -> ParsingResult [DT.Text]
 
 attrList _ _ [] = return []
