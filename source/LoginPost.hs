@@ -18,7 +18,7 @@ import qualified Data.Text as DT (Text, unpack, pack, concat)
 import qualified Data.Map as DM (insert)
 import qualified ConfigParse (content, UserSchema)
 import qualified FailureMessage (page)
-import qualified JRState (JRState(..), runFilteredLoggingT)
+import qualified JRState (JRState(..))
 import qualified Text.XML as XML (def, readFile)
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar (modifyTVar')
@@ -35,8 +35,7 @@ getLoginR acctName = YC.getYesod >>= pong acctName
 
 pong :: DT.Text -> JRState.JRState -> Foundation.Handler YC.Html
 
-pong acctName site = (YC.liftIO $ XML.readFile XML.def (DT.unpack contentName))
-		>>= YC.liftIO . JRState.runFilteredLoggingT site . ConfigParse.content contentName
+pong acctName site = YC.liftIO (XML.readFile XML.def (DT.unpack contentName) >>= ConfigParse.content site contentName)
 		>>= either FailureMessage.page (digest acctName site) where
 	contentName = DT.concat [JRState.userDir site, acctName, DT.pack ".cfg"]
 

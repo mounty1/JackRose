@@ -17,7 +17,6 @@ module ReviewPost (postHomeR) where
 import qualified Yesod as Y
 import qualified Yesod.Auth as YA
 import qualified Yesod.Core as YC
-import Control.Applicative ((<$>), (<*>))
 import qualified Foundation
 import Data.Text (Text)
 import LoginPlease (onlyIfAuthorised)

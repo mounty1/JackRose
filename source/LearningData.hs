@@ -35,7 +35,7 @@ DataSource
 	longName DT.Text
 	sourceSerial DT.Text UNIQUE NOT NULL
 	resynced UTCTime NOT NULL
-	UniqueSourceSerial sourceSerial
+	ByName shortName
 DataRow
 	key DT.Text NOT NULL
 	dataSourceRowId DataSourceId NOT NULL

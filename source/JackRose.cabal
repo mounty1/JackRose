@@ -21,6 +21,7 @@ executable JackRose
                       monad-control,
                       hsql,
                       hsql-postgresql,
+                      persistent-postgresql,
                       smtp-mail,
                       ConfigFile,
                       mtl,

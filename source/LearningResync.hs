@@ -20,6 +20,7 @@ module LearningResync (update) where
 import Data.Time (getCurrentTime, UTCTime)
 import Control.Exception (catch)
 import Data.List (foldl', intersperse)
+import qualified Data.Map as DM (insert)
 import qualified Data.Text as DT (Text, concat, empty, pack, unpack)
 import qualified Database.Persist.Class (Key)
 import Database.Persist.Sql (Entity)
@@ -37,45 +38,58 @@ import qualified Database.HSQL as HSQL (Statement, ColDef, SqlError, describe, C
 import Database.HSQL.PostgreSQL (connectWithOptions)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Logger (LoggingT, logWarnNS)
+import Control.Monad.STM (atomically)
+import Control.Concurrent.STM.TVar (modifyTVar')
+import ConnectionData (DataDescriptor(..), DataHandle(..))
 
 
 -- | Create handles or connections to all data sources;  then read them to be sure
--- all records are known.
+-- | all records are known.
 update :: JRState.JRState -> IO ()
-update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (JRState.tablesFile site) >>= foldl' (updateOneSource site) (liftIO $ return ())
+update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (JRState.tablesFile site)
+			-- convert the list of data-source rcords into a map of open connections
+			>>= foldl' (updateOneSource site) (liftIO $ return [])
+			-- then merge that make into the held set
+			-- TODO: what about when the key is already in the map?
+			-- The code above returns a list of (key, descriptor) pairs
+			-- The code below folds them into the TVar set, which in the current implementation
+			-- will be empty because this code is being evaluated at start-up time.
+			>>= liftIO . atomically . modifyTVar' (JRState.dataSchemes site) . (flip $ foldr $ uncurry DM.insert)
 
 
-updateOneSource :: JRState.JRState -> LoggingT IO () -> Entity LearningData.DataSource -> LoggingT IO ()
+type DataSchemes = [(DT.Text, ConnectionData.DataDescriptor)]
 
-updateOneSource site dummy sourceRecord = maybe badConnString mkConnection (deSerialise dataSourceString) where
 
-	badConnString = logWarnNS dataShortString $ DT.concat [DT.pack "Invalid data source: ", dataSourceString]
+updateOneSource :: JRState.JRState -> LoggingT IO DataSchemes -> Entity LearningData.DataSource -> LoggingT IO DataSchemes
 
-	mkConnection :: DS.DataVariant -> LoggingT IO ()
+updateOneSource site schemeMap sourceRecord = maybe badConnString mkConnection (deSerialise dataSourceString) where
+
+	badConnString = logWarnNS dataShortString (DT.concat [DT.pack "Invalid data source: ", dataSourceString]) >> schemeMap
+
+	mkConnection :: DS.DataVariant -> LoggingT IO DataSchemes
 	mkConnection connClass = liftIO (connection site connClass) >>= reSyncRows
 
-	reSyncRows :: OpenDataSource -> LoggingT IO ()
-	reSyncRows (Unavailable justification) = logWarnNS dataShortString justification
-	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO getCurrentTime >>= updateSync where
+	reSyncRows :: OpenDataSource -> LoggingT IO DataSchemes
+	reSyncRows (Unavailable justification) = logWarnNS dataShortString justification >> schemeMap
+	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO getCurrentTime >>= updateSync
+				>> schemeMap >>= liftIO . return . (:) (dataShortString, (DataDescriptor dataLongString colheads openConn)) where
 		updateSync timeStamp = liftIO (reSyncOneSource openConn site colheads timeStamp priKeys dataSourceKey learningPersistPool) >>= updateSource timeStamp
 		--update time-stamp only replace if new data_rows were inserted.
-		updateSource timeStamp True = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool >> dummy
-		updateSource _ False = dummy
+		updateSource timeStamp True = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool
+		updateSource _ False = return ()
 
 	learningPersistPool = JRState.tablesFile site
 	dataSourceKey = entityKey sourceRecord
 	dataSourceParts = entityVal sourceRecord
 	dataSourceString = LearningData.dataSourceSourceSerial dataSourceParts
 	dataShortString = LearningData.dataSourceShortName dataSourceParts
+	dataLongString = LearningData.dataSourceLongName dataSourceParts
 
 
-data OpenDataSource = OpenDataSource OpenConnection [DT.Text] [DT.Text] | Unavailable DT.Text
+data OpenDataSource = OpenDataSource DataHandle [DT.Text] [DT.Text] | Unavailable DT.Text
 
 
-data OpenConnection = Postgres HSQL.Connection DT.Text | Sqlite3 DT.Text | CSV Char DT.Text | XMLSource DT.Text
-
-
-reSyncOneSource :: OpenConnection -> JRState.JRState -> [DT.Text] -> UTCTime -> [DT.Text] -> Database.Persist.Class.Key LearningData.DataSource -> ConnectionPool -> IO Bool
+reSyncOneSource :: DataHandle -> JRState.JRState -> [DT.Text] -> UTCTime -> [DT.Text] -> Database.Persist.Class.Key LearningData.DataSource -> ConnectionPool -> IO Bool
 
 reSyncOneSource (Postgres sourceConn sourceDBtable) site _ timeStamp primaryKey sourceKey learningPersistPool = HSQL.query sourceConn primyKeyQuery >>= insertEachRow where
 	insertEachRow statement = HSQL.forEachRow row1yKeyUpdate statement False
@@ -84,6 +98,7 @@ reSyncOneSource (Postgres sourceConn sourceDBtable) site _ timeStamp primaryKey 
 	-- Insert one key value into learning data, if it not already exist therein.
 	-- We don't log anything because the Persist calls do it all.
 	-- We accume a Boolean which is 'was anything changed?'
+	-- TODO try mapM insertBy [rows]
 	tryInsert changed keyValue = JRState.runFilteredLoggingT site (runSqlPool (insertBy (LearningData.DataRow keyValue sourceKey timeStamp)) learningPersistPool)
 			>>= return . either (const changed) (const True)
 	-- primary key fields serialised into one Text
