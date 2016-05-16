@@ -22,9 +22,8 @@ import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse)
 import LoginPlease (onlyIfAuthorised)
-import qualified JRState (JRState(..))
-import qualified ConfigParse (UserSchema(..), View(..))
-import Control.Concurrent.STM.TVar (readTVarIO)
+import qualified JRState (getUserConfig)
+import qualified ConfigData (UserSchemaCpt(..), UserSchema)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -35,7 +34,7 @@ getHomeR = onlyIfAuthorised review
 -- | show next item for review, for the logged-in user
 review :: DT.Text -> Foundation.Handler YC.Html
 review username = YC.getYesod
-		>>= YC.liftIO . readTVarIO . JRState.userConfig
+		>>= YC.liftIO . JRState.getUserConfig
 		>>= return . BZH.toHtml . maybe (errorNoUser username) mashAround . DM.lookup username
 
 
@@ -43,9 +42,9 @@ errorNoUser :: DT.Text -> XML.Document
 errorNoUser username = mashAround' [XML.NodeContent $ DT.concat ["user \"", username, "\" dropped from state"]]
 
 
-mashAround :: ConfigParse.UserSchema -> XML.Document
-mashAround (ConfigParse.UserSchema (ConfigParse.View _ _ obverse _ : _)) = mashAround' obverse
-mashAround (ConfigParse.UserSchema []) = mashAround' []
+mashAround :: ConfigData.UserSchema -> XML.Document
+mashAround (ConfigData.View _ _ obverse _ : _) = mashAround' obverse
+mashAround [] = mashAround' []
 
 
 mashAround' :: [XML.Node] -> XML.Document

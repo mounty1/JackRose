@@ -3,7 +3,7 @@ site/
 JackRose.xcf
 source/.halcyon
 source/dist
-source/gentoo
+source/cabal.sandbox.config
 sandbox/jackrose.aes
 sandbox/jackrose.sqlite
 sandbox/jackrose.sqlite-wal

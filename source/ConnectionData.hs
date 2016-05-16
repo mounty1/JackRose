@@ -21,5 +21,4 @@ data DataDescriptor = DataDescriptor Text [Text] DataHandle
 data DataHandle
         = Postgres Connection Text
         | Sqlite3 { tableName :: Text }
-        | CSV { separator :: Char, fileCSV :: Text }
-        | XMLSource { fileXML :: Text }
+        | External { partionNum :: Int }

@@ -133,11 +133,7 @@ connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybe
 	primaryKey :: HSQL.Connection -> IO [DT.Text]
 	primaryKey conn = HSQL.query conn primyKeyQuery >>= HSQL.collectRows (flip columnValue attNameP)
 
-connection _ (DS.Sqlite3 dtableName) = return $ OpenDataSource (Sqlite3 dtableName) [] []
-
-connection _ (DS.CSV recSep ffileCSV) = return $ OpenDataSource (CSV recSep ffileCSV) [] []
-
-connection _ (DS.XMLSource ffileXML) = return $ OpenDataSource (XMLSource ffileXML) [] []
+connection _ (DS.Sqlite3 dtableName) = return $ OpenDataSource (ConnectionData.Sqlite3 dtableName) [] []
 
 
 attName :: String

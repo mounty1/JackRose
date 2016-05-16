@@ -17,7 +17,7 @@ encountered, the definition of our monad means that evaluation backs out immedia
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module ConfigParse (UserSchema(..), SchemaParsing, View(..), content) where
+module ConfigParse (SchemaParsing, content) where
 
 
 import qualified Data.Text as DT (Text, concat, append, singleton, all)
@@ -29,7 +29,7 @@ import qualified JRState
 import Data.Maybe (fromJust)
 import Data.Either (partitionEithers)
 import Control.Monad.Logger (LoggingT, logWarnNS, logDebugNS, logErrorNS)
-import ConfigData (View(..), UserSchema(..))
+import ConfigData (UserSchemaCpt(..), UserSchema)
 
 
 -- | Version of the configuration file schema.  This is incremented only
@@ -92,7 +92,7 @@ content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothin
 	attrList context attrs ["version"] []
 		>>= \([version], []) ->
 			if version == documentVersionText then
-				contents context children dataSchemes (UserSchema [])
+				contents context children dataSchemes []
 			else
 				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""] where
 	context = mkContext top sourceName
@@ -161,15 +161,15 @@ schemaItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema _ =
 
 schemaItem context@(XMLFileContext nodes deckName) (XML.Element (XML.Name "deck" Nothing Nothing) attrs children) schema dataSchemes =
 	attrList context attrs ["name"] []
-		>>= \([name], []) -> contents (XMLFileContext nodes (name : deckName)) children dataSchemes schema
+		>>= \([name], []) -> (\ss -> ConfigData.SubSchema name ss : schema) `fmap` contents (XMLFileContext nodes (name : deckName)) children dataSchemes []
 
-schemaItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) (UserSchema p) dataSchemes =
+schemaItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) schema dataSchemes =
 	attrList context attrs ["UID", "source"] []
 		>>= \([idy, source], []) -> maybe
 				(failToParse context (source : ": " : invalidItem))
 				(\conn -> spliceView conn idy `fmap` viewItem context attrs (Nothing, Nothing) children)
 				(DM.lookup source dataSchemes) where
-	spliceView conn viewId (front, back) = UserSchema (View conn viewId front back : p)
+	spliceView conn viewId (front, back) = ConfigData.View conn viewId front back : schema
 
 schemaItem context (XML.Element (XML.Name other _ _) _ _) _ _ = failToParse context (other : ": " : invalidItem)
 

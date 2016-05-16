@@ -16,7 +16,9 @@ import Text.XML (Node)
 import ConnectionData (DataDescriptor)
 
 
-data View = View {
+data UserSchemaCpt =
+	SubSchema Text UserSchema |
+	View {
 		dataSource :: DataDescriptor,
 		label :: Text,
 		obverse :: [Node],
@@ -24,4 +26,4 @@ data View = View {
 	}
 
 
-newtype UserSchema = UserSchema [View]
+type UserSchema = [UserSchemaCpt]
