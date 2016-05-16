@@ -43,7 +43,7 @@ errorNoUser username = mashAround' [XML.NodeContent $ DT.concat ["user \"", user
 
 
 mashAround :: ConfigData.UserSchema -> XML.Document
-mashAround (ConfigData.View _ _ obverse _ : _) = mashAround' obverse
+mashAround (ConfigData.View _ _ _ _ obverse _ : _) = mashAround' obverse
 mashAround [] = mashAround' []
 
 

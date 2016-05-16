@@ -38,6 +38,8 @@ data JRState = JRState {
 			-- ^ name of file containing SQLite3 tables
 		secureOnly :: Bool,
 			-- ^ restrict connections to HTTPS
+		shuffleCards :: Bool,
+			-- ^ default value for shuffling of per-user reviews
 		sessionTimeout :: Int,
 			-- ^ in minutes
 		portNumber :: Maybe Int,

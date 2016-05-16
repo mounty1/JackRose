@@ -18,8 +18,8 @@ module DataSource (DataSource(..), DataVariant(..), enSerialise, deSerialise) wh
 
 import TextShow (showt)
 import qualified Data.Text as DT (Text, singleton, empty, null, head, length)
-import qualified Data.Text.Read as DTR (decimal)
 import qualified TextList as DL (enSerialise, deSerialise)
+import MaybeIntValue (maybeIntValue)
 
 
 data DataSource = DataSource DT.Text DT.Text DataVariant
@@ -38,15 +38,6 @@ showMI = maybe DT.empty showt
 
 showMT :: Maybe DT.Text -> DT.Text
 showMT = maybe DT.empty id
-
-
-maybeIntValue :: DT.Text -> Maybe Int
-maybeIntValue = reduceIt . DTR.decimal
-
-
-reduceIt :: Either String (Int, DT.Text) -> Maybe Int
-reduceIt (Right (n, "")) = Just n
-reduceIt _ = Nothing
 
 
 enSerialise :: DataVariant -> DT.Text

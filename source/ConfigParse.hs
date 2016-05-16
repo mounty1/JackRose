@@ -20,7 +20,7 @@ encountered, the definition of our monad means that evaluation backs out immedia
 module ConfigParse (SchemaParsing, content) where
 
 
-import qualified Data.Text as DT (Text, concat, append, singleton, all)
+import qualified Data.Text as DT (Text, concat, append, singleton, all, toLower)
 import qualified Data.List as DL (intersperse, null, (\\))
 import qualified Text.XML as XML
 import qualified Data.Map as DM
@@ -29,7 +29,8 @@ import qualified JRState
 import Data.Maybe (fromJust)
 import Data.Either (partitionEithers)
 import Control.Monad.Logger (LoggingT, logWarnNS, logDebugNS, logErrorNS)
-import ConfigData (UserSchemaCpt(..), UserSchema)
+import MaybeIntValue (maybeIntValue)
+import qualified ConfigData (UserSchemaCpt(..), UserSchema)
 
 
 -- | Version of the configuration file schema.  This is incremented only
@@ -64,13 +65,13 @@ instance Functor ParsingResult where
 	fmap f (ParsingResult v) = ParsingResult $ fmap (fmap f) v
 
 
-type SchemaParsing = ParsingResult UserSchema
+type SchemaParsing = ParsingResult ConfigData.UserSchema
 
 
 type Attributes = DM.Map XML.Name DT.Text
 
 
-data XMLFileContext = XMLFileContext [DT.Text] [DT.Text]
+data XMLFileContext = XMLFileContext [DT.Text] [DT.Text] Bool
 
 
 logSource :: DT.Text
@@ -78,38 +79,38 @@ logSource = "user-schema"
 
 
 -- | Parse the users's configuration file.  This might fail (returning a @Left DT.Text@)
--- | or succeed (returning a @Right UserSchema@).
-content :: JRState.JRState -> DT.Text -> XML.Document -> IO (Either DT.Text UserSchema)
+-- | or succeed (returning a @Right ConfigData.UserSchema@).
+content :: JRState.JRState -> DT.Text -> XML.Document -> IO (Either DT.Text ConfigData.UserSchema)
 
-content site sourceName doco = JRState.getDataSchemes site >>= JRState.runFilteredLoggingT site . unwrapPR . content' sourceName doco
+content site sourceName doco = JRState.getDataSchemes site >>= JRState.runFilteredLoggingT site . unwrapPR . content' sourceName doco site
 
 
 -- Internal version of the above;  no need to expose the newtype wrapper,
 -- which exists only to allow for instance declarations.
-content' :: DT.Text -> XML.Document -> JRState.DataSchemes -> SchemaParsing
+content' :: DT.Text -> XML.Document -> JRState.JRState -> JRState.DataSchemes -> SchemaParsing
 
-content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) dataSchemes =
+content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) site dataSchemes =
 	attrList context attrs ["version"] []
 		>>= \([version], []) ->
 			if version == documentVersionText then
 				contents context children dataSchemes []
 			else
 				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""] where
-	context = mkContext top sourceName
+	context = mkContext top sourceName (JRState.shuffleCards site)
 
-content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) _ =
-	failToParse (mkContext top sourceName) ["document not jackrose"]
+content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) _ _ =
+	failToParse (mkContext top sourceName False) ["document not jackrose"]
 
 
-mkContext :: XML.Element -> DT.Text -> XMLFileContext
-mkContext top sourceName = XMLFileContext [ tagText top, "File=" `DT.append` sourceName ] []
+mkContext :: XML.Element -> DT.Text -> Bool -> XMLFileContext
+mkContext top sourceName shuffle = XMLFileContext [ tagText top, "File=" `DT.append` sourceName ] [] shuffle
 
 
 -- Fail to parse.  This is a quite crucial function because it returns a Left value;
 -- thus, all the @<$>@ and @>>=@ will just pass through the failure message and eventually
 -- return it to the caller.
 failToParse :: XMLFileContext -> [DT.Text] -> ParsingResult a
-failToParse (XMLFileContext nodeStack _) message = ParsingResult $ logErrorNS logSource stream >> (return $ Left $ DT.concat message) where
+failToParse (XMLFileContext nodeStack _ _) message = ParsingResult $ logErrorNS logSource stream >> (return $ Left $ DT.concat message) where
 	stream = DT.concat $ DL.intersperse ":" (reverse nodeStack) ++ (": " : message)
 
 
@@ -124,7 +125,7 @@ tagText (XML.Element (XML.Name plainName namespace prefix) attrs _) = DT.concat 
 
 -- Add extra level to XML nodeStack
 tagStack :: XMLFileContext -> XML.Element -> XMLFileContext
-tagStack (XMLFileContext nodes views) element = XMLFileContext (tagText element : nodes) views
+tagStack (XMLFileContext nodes views shuffle) element = XMLFileContext (tagText element : nodes) views shuffle
 
 
 -- show attribute+value pair
@@ -138,8 +139,20 @@ qualiform Nothing = ""
 qualiform (Just repr) = repr `DT.append` ":"
 
 
+reshuffle :: Bool -> Maybe DT.Text -> Bool
+reshuffle now Nothing = now
+reshuffle now (Just text) =
+	if lText `elem` ["y", "yes", "1", "t", "true" ] then
+		True
+	else if lText `elem` ["n", "no", "0", "f", "false"] then
+		False
+	else
+		now where
+	lText = DT.toLower text
+
+
 -- Parse nodes directly within the top-level @<jackrose>@ document.
-contents :: XMLFileContext -> [XML.Node] -> JRState.DataSchemes -> UserSchema -> SchemaParsing
+contents :: XMLFileContext -> [XML.Node] -> JRState.DataSchemes -> ConfigData.UserSchema -> SchemaParsing
 contents _ [] _ win = return win
 contents context (XML.NodeElement element : xs) dataSchemes win = schemaItem (tagStack context element) element win dataSchemes >>= contents context xs dataSchemes
 contents context (XML.NodeInstruction _ : xs) dataSchemes win = contents context xs dataSchemes win
@@ -148,7 +161,7 @@ contents context (XML.NodeContent text : xs) dataSchemes win = contents context 
 
 
 -- Parse @<tag>@s directly within the top-level @<jackrose>@ document.
-schemaItem :: XMLFileContext -> XML.Element -> UserSchema -> JRState.DataSchemes -> SchemaParsing
+schemaItem :: XMLFileContext -> XML.Element -> ConfigData.UserSchema -> JRState.DataSchemes -> SchemaParsing
 
 schemaItem _ (XML.Element (XML.Name "frontispiece" Nothing Nothing) _ _) schema _ =
 	ParsingResult $ logWarnNS logSource "Unimplemented <frontispiece>"  >> (return $ Right schema)
@@ -159,17 +172,18 @@ schemaItem _ (XML.Element (XML.Name "template" Nothing Nothing) _ _) schema _ =
 schemaItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema _ =
 	ParsingResult $ logWarnNS logSource "Unimplemented <invoke>"  >> (return $ Right schema)
 
-schemaItem context@(XMLFileContext nodes deckName) (XML.Element (XML.Name "deck" Nothing Nothing) attrs children) schema dataSchemes =
-	attrList context attrs ["name"] []
-		>>= \([name], []) -> (\ss -> ConfigData.SubSchema name ss : schema) `fmap` contents (XMLFileContext nodes (name : deckName)) children dataSchemes []
+schemaItem context@(XMLFileContext nodes deckName shuffle) (XML.Element (XML.Name "deck" Nothing Nothing) attrs children) schema dataSchemes =
+	attrList context attrs ["name"] ["limit", "shuffle"]
+		>>= \([name], [maybeLimit, maybeShuffle]) -> (\ss -> ConfigData.SubSchema (maybeLimit >>= maybeIntValue) (reshuffle shuffle maybeShuffle) name ss : schema) `fmap` contents (XMLFileContext nodes (name : deckName) shuffle) children dataSchemes []
 
-schemaItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) schema dataSchemes =
-	attrList context attrs ["UID", "source"] []
-		>>= \([idy, source], []) -> maybe
+schemaItem context@(XMLFileContext _ _ shuffle) (XML.Element (XML.Name "view" Nothing Nothing) attrs children) schema dataSchemes =
+	attrList context attrs ["UID", "source"] ["limit", "shuffle"]
+		>>= \([idy, source], [maybeLimit, maybeShuffle]) -> maybe
 				(failToParse context (source : ": " : invalidItem))
-				(\conn -> spliceView conn idy `fmap` viewItem context attrs (Nothing, Nothing) children)
+				(\conn -> 
+					(\(front, back) -> ConfigData.View conn (maybeLimit >>= maybeIntValue) (reshuffle shuffle maybeShuffle) idy front back : schema)
+						`fmap` viewItem context attrs (Nothing, Nothing) children)
 				(DM.lookup source dataSchemes) where
-	spliceView conn viewId (front, back) = ConfigData.View conn viewId front back : schema
 
 schemaItem context (XML.Element (XML.Name other _ _) _ _) _ _ = failToParse context (other : ": " : invalidItem)
 

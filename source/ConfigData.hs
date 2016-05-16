@@ -16,10 +16,15 @@ import Text.XML (Node)
 import ConnectionData (DataDescriptor)
 
 
+type NewThrottle = Maybe Int
+
+
 data UserSchemaCpt =
-	SubSchema Text UserSchema |
+	SubSchema NewThrottle Bool Text UserSchema |
 	View {
 		dataSource :: DataDescriptor,
+		throttle :: NewThrottle,
+		shuffle :: Bool,
 		label :: Text,
 		obverse :: [Node],
 		backside :: [Node]
