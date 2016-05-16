@@ -72,7 +72,7 @@ updateOneSource site schemeMap sourceRecord = maybe badConnString mkConnection (
 	reSyncRows :: OpenDataSource -> LoggingT IO DataSchemes
 	reSyncRows (Unavailable justification) = logWarnNS dataShortString justification >> schemeMap
 	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO getCurrentTime >>= updateSync
-				>> schemeMap >>= liftIO . return . (:) (dataShortString, (DataDescriptor dataLongString colheads openConn)) where
+				>> schemeMap >>= liftIO . return . (:) (dataShortString, (DataDescriptor dataLongString colheads dataSourceKey openConn)) where
 		updateSync timeStamp = liftIO (reSyncOneSource openConn site colheads timeStamp priKeys dataSourceKey learningPersistPool) >>= updateSource timeStamp
 		--update time-stamp only replace if new data_rows were inserted.
 		updateSource timeStamp True = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool

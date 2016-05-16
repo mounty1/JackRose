@@ -13,12 +13,13 @@ module ConnectionData where
 
 import Data.Text (Text)
 import Database.HSQL (Connection)
+import LearningData (DataSourceId)
 
 
-data DataDescriptor = DataDescriptor Text [Text] DataHandle
+data DataDescriptor = DataDescriptor Text [Text] DataSourceId DataHandle
 
 
 data DataHandle
         = Postgres Connection Text
         | Sqlite3 { tableName :: Text }
-        | External { partionNum :: Int }
+        | ExternalCached
