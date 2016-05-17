@@ -71,7 +71,12 @@ type SchemaParsing = ParsingResult ConfigData.UserSchema
 type Attributes = DM.Map XML.Name DT.Text
 
 
-data XMLFileContext = XMLFileContext [DT.Text] [DT.Text] Bool
+data XMLFileContext = XMLFileContext {
+	nodes :: [DT.Text],
+	views :: [DT.Text],
+	shuffle :: Bool,
+	dataSchemes :: JRState.DataSchemes
+}
 
 
 logSource :: DT.Text
@@ -89,29 +94,29 @@ content site sourceName doco = JRState.getDataSchemes site >>= JRState.runFilter
 -- which exists only to allow for instance declarations.
 content' :: DT.Text -> XML.Document -> JRState.JRState -> JRState.DataSchemes -> SchemaParsing
 
-content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) site dataSchemes =
+content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothing Nothing) attrs children) []) site dSchemes =
 	attrList context attrs ["version"] []
 		>>= \([version], []) ->
 			if version == documentVersionText then
-				contents context children dataSchemes []
+				contents context children []
 			else
 				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""] where
-	context = mkContext top sourceName (JRState.shuffleCards site)
+	context = mkContext top sourceName (JRState.shuffleCards site) dSchemes
 
-content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) _ _ =
-	failToParse (mkContext top sourceName False) ["document not jackrose"]
+content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) _ dSchemes =
+	failToParse (mkContext top sourceName False dSchemes) ["document not jackrose"]
 
 
-mkContext :: XML.Element -> DT.Text -> Bool -> XMLFileContext
-mkContext top sourceName shuffle = XMLFileContext [ tagText top, "File=" `DT.append` sourceName ] [] shuffle
+mkContext :: XML.Element -> DT.Text -> Bool -> JRState.DataSchemes -> XMLFileContext
+mkContext top sourceName = XMLFileContext [ tagText top, "File=" `DT.append` sourceName ] []
 
 
 -- Fail to parse.  This is a quite crucial function because it returns a Left value;
 -- thus, all the @<$>@ and @>>=@ will just pass through the failure message and eventually
 -- return it to the caller.
 failToParse :: XMLFileContext -> [DT.Text] -> ParsingResult a
-failToParse (XMLFileContext nodeStack _ _) message = ParsingResult $ logErrorNS logSource stream >> (return $ Left $ DT.concat message) where
-	stream = DT.concat $ DL.intersperse ":" (reverse nodeStack) ++ (": " : message)
+failToParse context message = ParsingResult $ logErrorNS logSource stream >> (return $ Left $ DT.concat message) where
+	stream = DT.concat $ DL.intersperse ":" (reverse $ nodes context) ++ (": " : message)
 
 
 failAllButBlank :: XMLFileContext -> DT.Text -> a -> ParsingResult a
@@ -125,7 +130,7 @@ tagText (XML.Element (XML.Name plainName namespace prefix) attrs _) = DT.concat 
 
 -- Add extra level to XML nodeStack
 tagStack :: XMLFileContext -> XML.Element -> XMLFileContext
-tagStack (XMLFileContext nodes views shuffle) element = XMLFileContext (tagText element : nodes) views shuffle
+tagStack context element = context{nodes = tagText element : nodes context}
 
 
 -- show attribute+value pair
@@ -152,40 +157,40 @@ reshuffle now (Just text) =
 
 
 -- Parse nodes directly within the top-level @<jackrose>@ document.
-contents :: XMLFileContext -> [XML.Node] -> JRState.DataSchemes -> ConfigData.UserSchema -> SchemaParsing
-contents _ [] _ win = return win
-contents context (XML.NodeElement element : xs) dataSchemes win = schemaItem (tagStack context element) element win dataSchemes >>= contents context xs dataSchemes
-contents context (XML.NodeInstruction _ : xs) dataSchemes win = contents context xs dataSchemes win
-contents context (XML.NodeComment _ : xs) dataSchemes win = contents context xs dataSchemes win
-contents context (XML.NodeContent text : xs) dataSchemes win = contents context xs dataSchemes win >>= failAllButBlank context text
+contents :: XMLFileContext -> [XML.Node] -> ConfigData.UserSchema -> SchemaParsing
+contents _ [] win = return win
+contents context (XML.NodeElement element : xs) win = schemaItem (tagStack context element) element win >>= contents context xs
+contents context (XML.NodeInstruction _ : xs) win = contents context xs win
+contents context (XML.NodeComment _ : xs) win = contents context xs win
+contents context (XML.NodeContent text : xs) win = contents context xs win >>= failAllButBlank context text
 
 
 -- Parse @<tag>@s directly within the top-level @<jackrose>@ document.
-schemaItem :: XMLFileContext -> XML.Element -> ConfigData.UserSchema -> JRState.DataSchemes -> SchemaParsing
+schemaItem :: XMLFileContext -> XML.Element -> ConfigData.UserSchema -> SchemaParsing
 
-schemaItem _ (XML.Element (XML.Name "frontispiece" Nothing Nothing) _ _) schema _ =
+schemaItem _ (XML.Element (XML.Name "frontispiece" Nothing Nothing) _ _) schema =
 	ParsingResult $ logWarnNS logSource "Unimplemented <frontispiece>"  >> (return $ Right schema)
 
-schemaItem _ (XML.Element (XML.Name "template" Nothing Nothing) _ _) schema _ =
+schemaItem _ (XML.Element (XML.Name "template" Nothing Nothing) _ _) schema =
 	ParsingResult $ logWarnNS logSource "Unimplemented <template>"  >> (return $ Right schema)
 
-schemaItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema _ =
+schemaItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema =
 	ParsingResult $ logWarnNS logSource "Unimplemented <invoke>"  >> (return $ Right schema)
 
-schemaItem context@(XMLFileContext nodes deckName shuffle) (XML.Element (XML.Name "deck" Nothing Nothing) attrs children) schema dataSchemes =
+schemaItem context (XML.Element (XML.Name "deck" Nothing Nothing) attrs children) schema =
 	attrList context attrs ["name"] ["limit", "shuffle"]
-		>>= \([name], [maybeLimit, maybeShuffle]) -> (\ss -> ConfigData.SubSchema (maybeLimit >>= maybeIntValue) (reshuffle shuffle maybeShuffle) name ss : schema) `fmap` contents (XMLFileContext nodes (name : deckName) shuffle) children dataSchemes []
+		>>= \([name], [maybeLimit, maybeShuffle]) -> (\ss -> ConfigData.SubSchema (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) name ss : schema) `fmap` contents context{views = name : views context} children []
 
-schemaItem context@(XMLFileContext _ _ shuffle) (XML.Element (XML.Name "view" Nothing Nothing) attrs children) schema dataSchemes =
+schemaItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) schema =
 	attrList context attrs ["UID", "source"] ["limit", "shuffle"]
 		>>= \([idy, source], [maybeLimit, maybeShuffle]) -> maybe
 				(failToParse context (source : ": " : invalidItem))
 				(\conn -> 
-					(\(front, back) -> ConfigData.View conn (maybeLimit >>= maybeIntValue) (reshuffle shuffle maybeShuffle) idy front back : schema)
+					(\(front, back) -> ConfigData.View conn (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) idy front back : schema)
 						`fmap` viewItem context attrs (Nothing, Nothing) children)
-				(DM.lookup source dataSchemes) where
+				(DM.lookup source (dataSchemes context)) where
 
-schemaItem context (XML.Element (XML.Name other _ _) _ _) _ _ = failToParse context (other : ": " : invalidItem)
+schemaItem context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
 
 
 type CardFaces = (Maybe [XML.Node], Maybe [XML.Node])
