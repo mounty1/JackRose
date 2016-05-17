@@ -16,7 +16,12 @@ import Database.HSQL (Connection)
 import LearningData (DataSourceId)
 
 
-data DataDescriptor = DataDescriptor Text [Text] DataSourceId DataHandle
+data DataDescriptor = DataDescriptor {
+	descriptiveName :: Text,
+	columnNames :: [Text],
+	sourceId :: DataSourceId,
+	openConnection :: DataHandle
+}
 
 
 data DataHandle
