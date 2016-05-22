@@ -43,8 +43,10 @@ DataRow
 	UniqueRowIndex key dataSourceRowId
 View
 	viewUID DT.Text NOT NULL
-	itemRowId DataRowId NOT NULL
-	UniqueViewIndex viewUID itemRowId
+	sourceId DataSourceId NOT NULL
+	obverse DT.Text NOT NULL
+	reverse DT.Text NOT NULL
+	UniqueViewIndex viewUID sourceId
 LearnDatum
 	viewUID ViewId NOT NULL
 	user UserId NOT NULL

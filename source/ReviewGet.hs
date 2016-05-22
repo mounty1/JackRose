@@ -11,44 +11,63 @@ Portability: undefined
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module ReviewGet (getHomeR) where
+module ReviewGet (getHomeR, getReviewR) where
 
 
 import qualified Yesod.Core as YC
 import qualified Foundation (Handler)
-import qualified Data.Text as DT (Text, singleton, concat)
+import qualified Data.Text as DT (Text, split, singleton, concat, null)
 import qualified Text.XML as XML
 import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
-import qualified Data.List as DL (intersperse)
+import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (getUserConfig)
-import qualified ConfigData (UserSchemaCpt(..), UserSchema)
+import qualified ConfigData (UserSchemaCpt(..), UserSchemaNode(..), UserSchema)
+import Data.Time (getCurrentTime, UTCTime)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
 getHomeR :: Foundation.Handler YC.Html
-getHomeR = onlyIfAuthorised review
+getHomeR = onlyIfAuthorised (review "")
 
 
 -- | show next item for review, for the logged-in user
-review :: DT.Text -> Foundation.Handler YC.Html
-review username = YC.getYesod
+getReviewR :: DT.Text -> Foundation.Handler YC.Html
+getReviewR deckSteck = onlyIfAuthorised (review deckSteck)
+
+
+review :: DT.Text -> DT.Text -> Foundation.Handler YC.Html
+review deckSteck username = YC.getYesod
 		>>= YC.liftIO . JRState.getUserConfig
-		>>= return . BZH.toHtml . maybe (errorNoUser username) mashAround . DM.lookup username
+		>>= YC.liftIO . fmap BZH.toHtml . maybe (errorNoUser username) (mashAround $ splitSlash deckSteck) . DM.lookup username
 
 
-errorNoUser :: DT.Text -> XML.Document
-errorNoUser username = mashAround' [XML.NodeContent $ DT.concat ["user \"", username, "\" dropped from state"]]
+splitSlash :: DT.Text -> [DT.Text]
+splitSlash = DL.filter (not . DT.null) . DT.split (== '/')
 
 
-mashAround :: ConfigData.UserSchema -> XML.Document
-mashAround (ConfigData.View _ _ _ _ obverse _ : _) = mashAround' obverse
-mashAround [] = mashAround' []
+errorNoUser :: DT.Text -> IO XML.Document
+errorNoUser username = informationMessage ["user \"", username, "\" dropped from state"]
 
 
-mashAround' :: [XML.Node] -> XML.Document
-mashAround' face = XML.Document standardPrologue (embed face) []
+mashAround :: [DT.Text] -> ConfigData.UserSchema -> IO XML.Document
+
+mashAround _ [] = informationMessage ["no more items"]
+
+mashAround all@(d1 : dn) (ConfigData.UserSchemaNode throttle shuffle label item : rest) = if d1 == label then mashAround' item else mashAround all rest where
+	mashAround' (ConfigData.SubSchema sub) = mashAround dn sub
+	mashAround' (ConfigData.View _ obverse _) = getCurrentTime >>= mashAround'' where
+		mashAround'' _time = documentHTML obverse
+
+
+
+informationMessage :: [DT.Text] -> IO XML.Document
+informationMessage messageWords = documentHTML [XML.NodeContent $ DT.concat messageWords]
+
+
+documentHTML :: [XML.Node] -> IO XML.Document
+documentHTML content = return $ XML.Document standardPrologue (embed content) []
 
 
 standardPrologue :: XML.Prologue

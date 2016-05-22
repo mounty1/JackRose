@@ -20,15 +20,21 @@ type NewThrottle = Maybe Int
 
 
 data UserSchemaCpt =
-	SubSchema NewThrottle Bool Text UserSchema |
+	SubSchema UserSchema |
 	View {
 		dataSource :: DataDescriptor,
-		throttle :: NewThrottle,
-		shuffle :: Bool,
-		label :: Text,
 		obverse :: [Node],
 		backside :: [Node]
 	}
 
 
-type UserSchema = [UserSchemaCpt]
+data UserSchemaNode =
+	UserSchemaNode {
+		throttle :: NewThrottle,
+		shuffle :: Bool,
+		label :: Text,
+		item :: UserSchemaCpt
+	}
+
+
+type UserSchema = [UserSchemaNode]

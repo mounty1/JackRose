@@ -30,7 +30,7 @@ import Data.Maybe (fromJust)
 import Data.Either (partitionEithers)
 import Control.Monad.Logger (LoggingT, logWarnNS, logDebugNS, logErrorNS)
 import MaybeIntValue (maybeIntValue)
-import qualified ConfigData (UserSchemaCpt(..), UserSchema)
+import qualified ConfigData (UserSchemaCpt(..), UserSchemaNode(..), UserSchema)
 
 
 -- | Version of the configuration file schema.  This is incremented only
@@ -179,14 +179,14 @@ schemaItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema =
 
 schemaItem context (XML.Element (XML.Name "deck" Nothing Nothing) attrs children) schema =
 	attrList context attrs ["name"] ["limit", "shuffle"]
-		>>= \([name], [maybeLimit, maybeShuffle]) -> (\ss -> ConfigData.SubSchema (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) name ss : schema) `fmap` contents context{views = name : views context} children []
+		>>= \([name], [maybeLimit, maybeShuffle]) -> (\ss -> ConfigData.UserSchemaNode (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) name (ConfigData.SubSchema ss) : schema) `fmap` contents context{views = name : views context} children []
 
 schemaItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) schema =
 	attrList context attrs ["UID", "source"] ["limit", "shuffle"]
 		>>= \([idy, source], [maybeLimit, maybeShuffle]) -> maybe
 				(failToParse context (source : ": " : invalidItem))
 				(\conn -> 
-					(\(front, back) -> ConfigData.View conn (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) idy front back : schema)
+					(\(front, back) -> ConfigData.UserSchemaNode (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) idy (ConfigData.View conn front back) : schema)
 						`fmap` viewItem context attrs (Nothing, Nothing) children)
 				(DM.lookup source (dataSchemes context)) where
 

@@ -23,7 +23,7 @@ module Application () where
 
 import qualified Yesod
 import qualified Yesod.Auth as YA
-import ReviewGet (getHomeR)
+import ReviewGet (getHomeR, getReviewR)
 import ReviewPost (postHomeR)
 import LoginPost (getLoginR, getLoginPostR)
 import Foundation
