@@ -17,7 +17,7 @@ History:  record of item scores.
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving #-}
 
 
-module LearningData (migrateData, DataSourceId, DataSource(..), DataRow(..), View(..), LearnDatum(..), History(..)) where
+module LearningData (migrateData, DataSourceId, DataSource(..), DataRow(..), View(..), LearnDatum(..), dueItems, History(..)) where
 
 
 import qualified Yesod as Y
@@ -25,6 +25,7 @@ import qualified Data.Text as DT (Text)
 import Authorisation (UserId)
 import Data.Int (Int8)
 import Data.Time (UTCTime)
+import Database.Persist (selectList, (<.))
 
 
 Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
@@ -57,3 +58,6 @@ History
 	stamp UTCTime NOT NULL
 	grade Int8 NOT NULL
 |]
+
+-- dueItems :: UTCTime -> Y.Filter LearnDatum
+dueItems stamp = selectList [ LearnDatumNextReview <. stamp ] []

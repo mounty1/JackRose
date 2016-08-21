@@ -24,23 +24,25 @@ import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (getUserConfig)
 import qualified ConfigData (UserSchemaCpt(..), UserSchemaNode(..), UserSchema)
+import LearningData (LearnDatum(..), dueItems)
 import Data.Time (getCurrentTime, UTCTime)
+import Database.Persist.Sqlite (selectList)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
 getHomeR :: Foundation.Handler YC.Html
-getHomeR = onlyIfAuthorised (review "")
+getHomeR = onlyIfAuthorised (review [])
 
 
 -- | show next item for review, for the logged-in user
 getReviewR :: DT.Text -> Foundation.Handler YC.Html
-getReviewR deckSteck = onlyIfAuthorised (review deckSteck)
+getReviewR deckSteck = onlyIfAuthorised (review $ splitSlash deckSteck)
 
 
-review :: DT.Text -> DT.Text -> Foundation.Handler YC.Html
-review deckSteck username = YC.getYesod
+review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
+review deckPath username = YC.getYesod
 		>>= YC.liftIO . JRState.getUserConfig
-		>>= YC.liftIO . fmap BZH.toHtml . maybe (errorNoUser username) (mashAround $ splitSlash deckSteck) . DM.lookup username
+		>>= YC.liftIO . fmap BZH.toHtml . maybe (errorNoUser username) (drillDeckStack deckPath) . DM.lookup username
 
 
 splitSlash :: DT.Text -> [DT.Text]
@@ -48,22 +50,62 @@ splitSlash = DL.filter (not . DT.null) . DT.split (== '/')
 
 
 errorNoUser :: DT.Text -> IO XML.Document
-errorNoUser username = informationMessage ["user \"", username, "\" dropped from state"]
+errorNoUser username = informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]
 
 
-mashAround :: [DT.Text] -> ConfigData.UserSchema -> IO XML.Document
+{- ALGORITHM:
+	NewThrottle = Nothing
+	Randomise = setting from config.
+	While deckPath != []:
+		NewThrottle = NewThrottle >>= fn(limit at this level, new cards in 24 hours)
+		Randomise = Randomise >> (setting from level)
+	If it's a View
+		if cards available:
+			show a card (random)
+		elif NewThrottle > 0
+			show a new card
+		else
+			no more
+	If it's a (sub-)deck:
+		If Random:
+			Depth-first search for View with cards available
+			if cards available
+				show a card (random)
 
-mashAround _ [] = informationMessage ["no more items"]
+			If some:
+				Any due items.
+				New items to all cascaded throttle.
+			else:
+				depth-first search for first unshuffled with items.
+				Any due items.
+				New items to all cascaded throttle.
+		else:
+			depth-first search for first Deck/View with items.
+PROBLEM:  calculation of used throttle.
+ -}
+drillDeckStack :: [DT.Text] -> ConfigData.UserSchema -> IO XML.Document
 
-mashAround all@(d1 : dn) (ConfigData.UserSchemaNode throttle shuffle label item : rest) = if d1 == label then mashAround' item else mashAround all rest where
-	mashAround' (ConfigData.SubSchema sub) = mashAround dn sub
-	mashAround' (ConfigData.View _ obverse _) = getCurrentTime >>= mashAround'' where
-		mashAround'' _time = documentHTML obverse
+drillDeckStack _ [] = informationMessage "no such deck"
+
+drillDeckStack [] stuff = informationMessage "TBD: process a sub-deck"
+
+drillDeckStack deckPath@(d1 : dn) (ConfigData.UserSchemaNode throttle shuffle label item : rest) =
+	if d1 == label then drillDeckNode dn item else drillDeckStack deckPath rest
 
 
+drillDeckNode :: [DT.Text] -> ConfigData.UserSchemaCpt -> IO XML.Document
 
-informationMessage :: [DT.Text] -> IO XML.Document
-informationMessage messageWords = documentHTML [XML.NodeContent $ DT.concat messageWords]
+drillDeckNode dn (ConfigData.SubSchema sub) = drillDeckStack dn sub
+
+drillDeckNode [] (ConfigData.View _ obverse _) = getCurrentTime >>= showCardItem where
+	showCardItem now = documentHTML obverse
+
+
+drillDeckNode _ (ConfigData.View _ _ _) = informationMessage "no such deck"
+
+
+informationMessage :: DT.Text -> IO XML.Document
+informationMessage message = documentHTML [XML.NodeContent message]
 
 
 documentHTML :: [XML.Node] -> IO XML.Document

@@ -27,11 +27,7 @@ data CmdLineArgs = CmdLineArgs {
 -- | get the raw command line arguments and populate a @CmdLineArgs@ instance
 -- with the data specified therein.
 args :: IO CmdLineArgs
-args = SE.getArgs >>= argsToMap
-
-
-argsToMap :: [String] -> IO CmdLineArgs
-argsToMap list = return $ populate (CmdLineArgs Nothing False) list
+args = populate (CmdLineArgs Nothing False) `fmap` SE.getArgs
 
 
 -- | take the head of what's left of the command line and change the @CmdLineArgs@
