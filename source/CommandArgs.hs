@@ -19,8 +19,8 @@ import qualified System.Environment as SE (getArgs)
 
 -- | The data that can be set via the command line.
 data CmdLineArgs = CmdLineArgs {
-		configName :: Maybe String,  -- ^ default defined in module @Configure@.
-		debuggery :: Bool  -- ^ default @False@
+		configName :: Maybe String,	-- ^ default defined in module @Configure@.
+		debuggery :: Bool	-- ^ default @False@
 	}
 
 

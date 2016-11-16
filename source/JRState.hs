@@ -14,7 +14,7 @@ module JRState where
 import Database.Persist.Sqlite (ConnectionPool)
 import AuthoriStyle (Style)
 import Data.Text (Text)
-import ConfigData (UserSchema)
+import UserDeck (UserDeckCpt)
 import Data.Map (Map)
 import Control.Concurrent.STM (TVar)
 import Control.Concurrent.STM.TVar (readTVarIO)
@@ -27,7 +27,7 @@ import ConnectionData (DataDescriptor)
 type DataSchemes = Map Text DataDescriptor
 
 
-type UserConfig = Map Text UserSchema
+type UserConfig = Map Text [UserDeckCpt]
 
 
 -- | The foundation object

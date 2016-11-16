@@ -17,7 +17,7 @@ import qualified Foundation (Handler)
 import qualified Data.Text as DT (Text, unpack, pack, concat)
 import qualified Data.Map as DM (insert)
 import qualified ConfigParse (content)
-import qualified ConfigData (UserSchema)
+import qualified UserDeck (UserDeckCpt)
 import qualified FailureMessage (page)
 import qualified JRState (JRState(..))
 import qualified Text.XML as XML (def, readFile)
@@ -41,7 +41,7 @@ pong acctName site = YC.liftIO (XML.readFile XML.def (DT.unpack contentName) >>=
 	contentName = DT.concat [JRState.userDir site, acctName, DT.pack ".cfg"]
 
 
-digest :: DT.Text -> JRState.JRState -> ConfigData.UserSchema -> Foundation.Handler YC.Html
+digest :: DT.Text -> JRState.JRState -> [UserDeck.UserDeckCpt] -> Foundation.Handler YC.Html
 
 digest acctName site userSchema =
 		(YC.liftIO $ atomically $ modifyTVar' (JRState.userConfig site) (DM.insert acctName userSchema))

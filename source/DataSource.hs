@@ -26,10 +26,10 @@ data DataSource = DataSource DT.Text DT.Text DataVariant
 
 -- | All the details to identify a data source without actually opening a connection to it.
 data DataVariant
-        = Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
-        | Sqlite3 { tableName :: DT.Text }
-        | CSV { separator :: Char, fileCSV :: DT.Text }
-        | XMLSource { fileXML :: DT.Text }
+	= Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
+	| Sqlite3 { tableName :: DT.Text }
+	| CSV { separator :: Char, fileCSV :: DT.Text }
+	| XMLSource { fileXML :: DT.Text }
 
 
 showMI :: Maybe Int -> DT.Text
@@ -61,11 +61,11 @@ deSerialise' [ "P", serverIP, maybePort, dbase, maybeNamespace, dtable, maybeUse
 			dtable
 			(if DT.null maybeUsername then Nothing else Just maybeUsername)
 			(if DT.null maybePassword then Nothing else Just maybePassword)
-deSerialise' [ "Q", dtableName ]  = Just $ Sqlite3 dtableName
+deSerialise' [ "Q", dtableName ] = Just $ Sqlite3 dtableName
 deSerialise' [ "C", recseparator, ffileCSV ] =
 		if DT.length recseparator == 1 then
 			Just $ CSV (DT.head recseparator) ffileCSV
 		else
 			Nothing
-deSerialise' [ "X", ffileXML ]  = Just $ XMLSource ffileXML
+deSerialise' [ "X", ffileXML ] = Just $ XMLSource ffileXML
 deSerialise' _ = Nothing

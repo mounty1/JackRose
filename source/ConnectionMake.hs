@@ -23,13 +23,6 @@ import qualified JRState (JRState, runFilteredLoggingT)
 import qualified Control.Monad.Logger as CML (runStdoutLoggingT)
 import ConnectionData (DataDescriptor(..), DataHandle(..))
 
-{-
-data DataVariant
-        = Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
-        | Sqlite3 { tableName :: DT.Text }
-        | CSV { separator :: Char, fileCSV :: DT.Text }
-        | XMLSource { fileXML :: DT.Text }
--}
 
 openConnection :: DataSource.DataSource -> JRState.JRState -> DataDescriptor
 openConnection site (DataSource.DataSource _ longName varPart) = DataDescriptor longName (openConn' site varPart)
@@ -38,6 +31,6 @@ openConnection site (DataSource.DataSource _ longName varPart) = DataDescriptor 
 openConn' :: DataSource.DataVariant -> JRState.JRState -> IO DataHandle
 openConn' site (Postgres server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text ) =
 		(CML.runStdoutLoggingT $ JRState.runFilteredLoggingT site $ DPP.createPostgresqlPool connString 5) >>= flip . (return . Postgres) table where
-		connString = DT.concat ["host=", server, mkIntCpt "port" port, mkConnCpt "user" username, "  dbname=", database, mkConnCpt "password" password]
+		connString = DT.concat ["host=", server, mkIntCpt "port" port, mkConnCpt "user" username, " dbname=", database, mkConnCpt "password" password]
 		mkConnCpt label maybeStr = maybe DT.empty (\c -> DT.concat [" ", label, "=", c])
 		mkIntCpt label maybeInt = mkConnCpt label (fmap show maybeInt)

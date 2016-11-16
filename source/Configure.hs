@@ -52,7 +52,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \t -> atomically (newTVar
 
 		-- accumulate up the fields of the site object, one by one.
 		-- the list of configuration key values is of course static, but subject to maintenance.
-		makeAppObject :: PerstQ.ConnectionPool ->  IO JRState.JRState
+		makeAppObject :: PerstQ.ConnectionPool -> IO JRState.JRState
 		makeAppObject pool = spliceShared (almostAppObject pool) (DC.options configuration defaultSection)
 		almostAppObject pool =
 			extractConfItem authory AuthoriStyle.Email "trustedSite" $
@@ -121,4 +121,4 @@ authory True = AuthoriStyle.Email
 
 
 defaultSection :: String
-defaultSection  = "DEFAULT"
+defaultSection = "DEFAULT"

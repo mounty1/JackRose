@@ -5,12 +5,6 @@ License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
 Stability: experimental
 Portability: undefined
-
-DataSource: reference to some database table or flat file.
-DataRow:  in Anki parlance, a note.
-View: 'card':  display information * data row
-LearnDatum:  card * user.
-History:  record of item scores.
 -}
 
 

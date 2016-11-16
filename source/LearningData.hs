@@ -26,6 +26,8 @@ import Authorisation (UserId)
 import Data.Int (Int8)
 import Data.Time (UTCTime)
 import Database.Persist (selectList, (<.))
+import qualified Database.Persist.Sql.Types.Internal (SqlBackend)
+import qualified Control.Monad.Trans.Reader (ReaderT)
 
 
 Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
@@ -59,5 +61,5 @@ History
 	grade Int8 NOT NULL
 |]
 
--- dueItems :: UTCTime -> Y.Filter LearnDatum
+dueItems :: (Y.MonadIO m, Y.PersistQueryRead backend, Y.BaseBackend backend ~ Database.Persist.Sql.Types.Internal.SqlBackend) => UTCTime -> Control.Monad.Trans.Reader.ReaderT backend m [Y.Entity LearnDatum]
 dueItems stamp = selectList [ LearnDatumNextReview <. stamp ] []

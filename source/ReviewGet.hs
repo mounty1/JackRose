@@ -23,10 +23,9 @@ import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (getUserConfig)
-import qualified ConfigData (UserSchemaCpt(..), UserSchemaNode(..), UserSchema)
+import qualified UserDeck (UserDeckCpt(..), NewThrottle)
 import LearningData (LearnDatum(..), dueItems)
-import Data.Time (getCurrentTime, UTCTime)
-import Database.Persist.Sqlite (selectList)
+import Data.Time (getCurrentTime)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -40,9 +39,9 @@ getReviewR deckSteck = onlyIfAuthorised (review $ splitSlash deckSteck)
 
 
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
-review deckPath username = YC.getYesod
+review deckPath {- | e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod
 		>>= YC.liftIO . JRState.getUserConfig
-		>>= YC.liftIO . fmap BZH.toHtml . maybe (errorNoUser username) (drillDeckStack deckPath) . DM.lookup username
+		>>= YC.liftIO . fmap BZH.toHtml . maybe (errorNoUser username) (drillDeckStack Nothing deckPath) . DM.lookup username
 
 
 splitSlash :: DT.Text -> [DT.Text]
@@ -83,25 +82,36 @@ errorNoUser username = informationMessage $ DT.concat ["user \"", username, "\" 
 			depth-first search for first Deck/View with items.
 PROBLEM:  calculation of used throttle.
  -}
-drillDeckStack :: [DT.Text] -> ConfigData.UserSchema -> IO XML.Document
+drillDeckStack :: UserDeck.NewThrottle -> [DT.Text] -> [UserDeck.UserDeckCpt] -> IO XML.Document
 
-drillDeckStack _ [] = informationMessage "no such deck"
+-- Still nodes to descend in requested sub-tree, but nowhere to go
+drillDeckStack _ _ [] = informationMessage "no such deck"
 
-drillDeckStack [] stuff = informationMessage "TBD: process a sub-deck"
+-- XPath-like spec. is empty;  'stuff' is the requested sub-tree so pick an item to display.
+-- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
+-- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded daily throttling.
+drillDeckStack throttle [] stuff = drillDownDeck throttle stuff
 
-drillDeckStack deckPath@(d1 : dn) (ConfigData.UserSchemaNode throttle shuffle label item : rest) =
-	if d1 == label then drillDeckNode dn item else drillDeckStack deckPath rest
+-- both XPath-like and tree;  find a matching node (if it exist) and descend
+drillDeckStack throttle deckPath@(d1 : dn) (UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
+	if d1 == label then drillDeckStack (mergeThrottle throttle maybeThrottle) dn item else drillDeckStack throttle deckPath rest
+
+-- no match so try next peer
+drillDeckStack throttle deckPath (_ : rest) =
+	drillDeckStack throttle deckPath rest
 
 
-drillDeckNode :: [DT.Text] -> ConfigData.UserSchemaCpt -> IO XML.Document
+drillDownDeck :: UserDeck.NewThrottle -> [UserDeck.UserDeckCpt] -> IO XML.Document
 
-drillDeckNode dn (ConfigData.SubSchema sub) = drillDeckStack dn sub
+-- descended to a terminal node (a TableView) so get the next card from it
+drillDownDeck throttle (UserDeck.TableView _ _ _ dataSource obverse _ : _) = getCurrentTime >>= showCardItem where
+	showCardItem now = return $ XML.Document standardPrologue (embed obverse) []
 
-drillDeckNode [] (ConfigData.View _ obverse _) = getCurrentTime >>= showCardItem where
-	showCardItem now = documentHTML obverse
 
-
-drillDeckNode _ (ConfigData.View _ _ _) = informationMessage "no such deck"
+mergeThrottle :: UserDeck.NewThrottle -> UserDeck.NewThrottle -> UserDeck.NewThrottle
+mergeThrottle Nothing newThrottle = newThrottle
+mergeThrottle already Nothing = already
+mergeThrottle (Just already) (Just newThrottle) = Just (if already < newThrottle then already else newThrottle)
 
 
 informationMessage :: DT.Text -> IO XML.Document

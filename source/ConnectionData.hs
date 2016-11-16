@@ -25,6 +25,6 @@ data DataDescriptor = DataDescriptor {
 
 
 data DataHandle
-        = Postgres Connection Text
-        | Sqlite3 { tableName :: Text }
-        | ExternalCached
+	= Postgres Connection Text
+	| Sqlite3 { tableName :: Text }
+	| ExternalCached

@@ -30,7 +30,7 @@ import Data.Maybe (fromJust)
 import Data.Either (partitionEithers)
 import Control.Monad.Logger (LoggingT, logWarnNS, logDebugNS, logErrorNS)
 import MaybeIntValue (maybeIntValue)
-import qualified ConfigData (UserSchemaCpt(..), UserSchemaNode(..), UserSchema)
+import qualified UserDeck (UserDeckCpt(..))
 
 
 -- | Version of the configuration file schema.  This is incremented only
@@ -65,7 +65,7 @@ instance Functor ParsingResult where
 	fmap f (ParsingResult v) = ParsingResult $ fmap (fmap f) v
 
 
-type SchemaParsing = ParsingResult ConfigData.UserSchema
+type SchemaParsing = ParsingResult [UserDeck.UserDeckCpt]
 
 
 type Attributes = DM.Map XML.Name DT.Text
@@ -84,8 +84,8 @@ logSource = "user-schema"
 
 
 -- | Parse the users's configuration file.  This might fail (returning a @Left DT.Text@)
--- | or succeed (returning a @Right ConfigData.UserSchema@).
-content :: JRState.JRState -> DT.Text -> XML.Document -> IO (Either DT.Text ConfigData.UserSchema)
+-- | or succeed (returning a @Right UserDeck.UserSchema@).
+content :: JRState.JRState -> DT.Text -> XML.Document -> IO (Either DT.Text [UserDeck.UserDeckCpt])
 
 content site sourceName doco = JRState.getDataSchemes site >>= JRState.runFilteredLoggingT site . unwrapPR . content' sourceName doco site
 
@@ -157,7 +157,7 @@ reshuffle now (Just text) =
 
 
 -- Parse nodes directly within the top-level @<jackrose>@ document.
-contents :: XMLFileContext -> [XML.Node] -> ConfigData.UserSchema -> SchemaParsing
+contents :: XMLFileContext -> [XML.Node] -> [UserDeck.UserDeckCpt] -> SchemaParsing
 contents _ [] win = return win
 contents context (XML.NodeElement element : xs) win = schemaItem (tagStack context element) element win >>= contents context xs
 contents context (XML.NodeInstruction _ : xs) win = contents context xs win
@@ -166,27 +166,27 @@ contents context (XML.NodeContent text : xs) win = contents context xs win >>= f
 
 
 -- Parse @<tag>@s directly within the top-level @<jackrose>@ document.
-schemaItem :: XMLFileContext -> XML.Element -> ConfigData.UserSchema -> SchemaParsing
+schemaItem :: XMLFileContext -> XML.Element -> [UserDeck.UserDeckCpt] -> SchemaParsing
 
 schemaItem _ (XML.Element (XML.Name "frontispiece" Nothing Nothing) _ _) schema =
-	ParsingResult $ logWarnNS logSource "Unimplemented <frontispiece>"  >> (return $ Right schema)
+	ParsingResult $ logWarnNS logSource "Unimplemented <frontispiece>" >> (return $ Right schema)
 
 schemaItem _ (XML.Element (XML.Name "template" Nothing Nothing) _ _) schema =
-	ParsingResult $ logWarnNS logSource "Unimplemented <template>"  >> (return $ Right schema)
+	ParsingResult $ logWarnNS logSource "Unimplemented <template>" >> (return $ Right schema)
 
 schemaItem _ (XML.Element (XML.Name "invoke" Nothing Nothing) _ _) schema =
-	ParsingResult $ logWarnNS logSource "Unimplemented <invoke>"  >> (return $ Right schema)
+	ParsingResult $ logWarnNS logSource "Unimplemented <invoke>" >> (return $ Right schema)
 
 schemaItem context (XML.Element (XML.Name "deck" Nothing Nothing) attrs children) schema =
 	attrList context attrs ["name"] ["limit", "shuffle"]
-		>>= \([name], [maybeLimit, maybeShuffle]) -> (\ss -> ConfigData.UserSchemaNode (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) name (ConfigData.SubSchema ss) : schema) `fmap` contents context{views = name : views context} children []
+		>>= \([name], [maybeLimit, maybeShuffle]) -> (\ss -> UserDeck.SubDeck (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) name ss : schema) `fmap` contents context{views = name : views context} children []
 
 schemaItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) schema =
 	attrList context attrs ["UID", "source"] ["limit", "shuffle"]
 		>>= \([idy, source], [maybeLimit, maybeShuffle]) -> maybe
 				(failToParse context (source : ": " : invalidItem))
 				(\conn -> 
-					(\(front, back) -> ConfigData.UserSchemaNode (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) idy (ConfigData.View conn front back) : schema)
+					(\(front, back) -> UserDeck.TableView (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) idy conn front back : schema)
 						`fmap` viewItem context attrs (Nothing, Nothing) children)
 				(DM.lookup source (dataSchemes context)) where
 
