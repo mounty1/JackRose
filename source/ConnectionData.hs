@@ -12,7 +12,7 @@ module ConnectionData where
 
 
 import Data.Text (Text)
-import Database.HSQL (Connection)
+import Database.HDBC.PostgreSQL (Connection)
 import LearningData (DataSourceId)
 
 

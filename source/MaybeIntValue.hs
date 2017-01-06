@@ -18,6 +18,7 @@ import qualified Data.Text as DT (Text)
 import qualified Data.Text.Read as DTR (decimal)
 
 
+-- | Represents an optional number in a configuration file.
 maybeIntValue :: DT.Text -> Maybe Int
 maybeIntValue = reduceIt . DTR.decimal
 

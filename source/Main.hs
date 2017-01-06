@@ -18,12 +18,12 @@ import qualified Yesod as Y (warp)
 import qualified Authorisation (migrateData)
 import qualified LearningData (migrateData)
 import qualified Persistency (upgradeDB)
-import qualified Configure (siteObject)
 import qualified CommandArgs (args)
 import qualified JRState (JRState(..))
 import qualified Application () -- just to get the instance and the dispatcher
-import Data.Maybe (fromMaybe)
 import qualified LearningResync (update)
+import Data.Maybe (fromMaybe)
+import SiteConfigFromFile (siteObject)
 
 
 -- | Start here.
@@ -32,7 +32,7 @@ main :: IO ()
 -- use that to inform the construction of the foundation siteObject,
 -- check that the authorised users table is in the current format,
 -- and hand over to Warp, to launch the service.
-main = CommandArgs.args >>= Configure.siteObject >>= letsGo
+main = CommandArgs.args >>= siteObject >>= letsGo
 
 
 letsGo :: JRState.JRState -> IO ()

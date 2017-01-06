@@ -8,13 +8,14 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 
 module ReviewGet (getHomeR, getReviewR) where
 
 
 import qualified Yesod.Core as YC
+import Yesod.Core.Handler (setSession)
 import qualified Foundation (Handler)
 import qualified Data.Text as DT (Text, split, singleton, concat, null)
 import qualified Text.XML as XML
@@ -22,10 +23,22 @@ import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
-import qualified JRState (getUserConfig)
-import qualified UserDeck (UserDeckCpt(..), NewThrottle)
-import LearningData (LearnDatum(..), dueItems)
+import qualified JRState (runFilteredLoggingT, getUserConfig, JRState, tablesFile)
+import qualified UserDeck (UserDeckCpt(..), NewThrottle, obverse)
+import LearningData (ViewId, DataRowId, LearnDatumId, LearnDatum(..), dueItems)
 import Data.Time (getCurrentTime)
+import UserToId (userToId)
+import Authorisation (User)
+import Database.Persist.Sqlite (runSqlPool)
+import TextShow (showt)
+import Data.Maybe (listToMaybe)
+import Database.Persist.Sql (Entity(Entity), fromSqlKey)
+
+
+data ReviewParams = ExistingItem LearnDatumId | NewItem ViewId DataRowId
+
+
+type PresentationParams = (ReviewParams, XML.Document)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -39,83 +52,70 @@ getReviewR deckSteck = onlyIfAuthorised (review $ splitSlash deckSteck)
 
 
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
-review deckPath {- | e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod
-		>>= YC.liftIO . JRState.getUserConfig
-		>>= YC.liftIO . fmap BZH.toHtml . maybe (errorNoUser username) (drillDeckStack Nothing deckPath) . DM.lookup username
+review deckPath {- | e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod >>= zappo where
+		-- TODO: for no-user case, just go back to the login screen, but with the message;  then lose informationMessage
+			zappo site = (YC.liftIO $ userToId site username) >>= maybe (informationMessage "user disappeared") zimmo where
+				zimmo userId = (YC.liftIO $ JRState.getUserConfig site) >>= zemmo where
+					zemmo userConfig = maybe (informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site userId Nothing deckPath) (DM.lookup username userConfig)
 
 
 splitSlash :: DT.Text -> [DT.Text]
 splitSlash = DL.filter (not . DT.null) . DT.split (== '/')
 
 
-errorNoUser :: DT.Text -> IO XML.Document
-errorNoUser username = informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]
+descendToDeckRoot :: JRState.JRState -> Entity User -> UserDeck.NewThrottle -> [DT.Text] -> [UserDeck.UserDeckCpt] -> Foundation.Handler YC.Html
 
-
-{- ALGORITHM:
-	NewThrottle = Nothing
-	Randomise = setting from config.
-	While deckPath != []:
-		NewThrottle = NewThrottle >>= fn(limit at this level, new cards in 24 hours)
-		Randomise = Randomise >> (setting from level)
-	If it's a View
-		if cards available:
-			show a card (random)
-		elif NewThrottle > 0
-			show a new card
-		else
-			no more
-	If it's a (sub-)deck:
-		If Random:
-			Depth-first search for View with cards available
-			if cards available
-				show a card (random)
-
-			If some:
-				Any due items.
-				New items to all cascaded throttle.
-			else:
-				depth-first search for first unshuffled with items.
-				Any due items.
-				New items to all cascaded throttle.
-		else:
-			depth-first search for first Deck/View with items.
-PROBLEM:  calculation of used throttle.
- -}
-drillDeckStack :: UserDeck.NewThrottle -> [DT.Text] -> [UserDeck.UserDeckCpt] -> IO XML.Document
+-- If XPath-like spec. is empty then 'stuff' is the requested sub-tree so pick an item to display.
+-- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
+-- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
+-- which is the daily (well, sliding 24 hour window) limit on new cards.
+descendToDeckRoot site userParams throttle [] stuff = searchForExisting site userParams stuff >>= maybe (searchForNew site userParams throttle stuff >>= maybe (informationMessage "no more items") setAndReturn) setAndReturn
 
 -- Still nodes to descend in requested sub-tree, but nowhere to go
-drillDeckStack _ _ [] = informationMessage "no such deck"
-
--- XPath-like spec. is empty;  'stuff' is the requested sub-tree so pick an item to display.
--- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
--- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded daily throttling.
-drillDeckStack throttle [] stuff = drillDownDeck throttle stuff
+descendToDeckRoot _ _ _ _ [] = informationMessage "nowhere to go"
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
-drillDeckStack throttle deckPath@(d1 : dn) (UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
-	if d1 == label then drillDeckStack (mergeThrottle throttle maybeThrottle) dn item else drillDeckStack throttle deckPath rest
+descendToDeckRoot site userParams throttle deckPath@(d1 : dn) (UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
+	if d1 == label then descendToDeckRoot site userParams newThrottle dn item else descendToDeckRoot site userParams throttle deckPath rest where
+		newThrottle = mergeThrottle throttle maybeThrottle
 
 -- no match so try next peer
-drillDeckStack throttle deckPath (_ : rest) =
-	drillDeckStack throttle deckPath rest
+descendToDeckRoot site userParams throttle deckPath (_ : rest) = descendToDeckRoot site userParams throttle deckPath rest
 
 
-drillDownDeck :: UserDeck.NewThrottle -> [UserDeck.UserDeckCpt] -> IO XML.Document
+-- TODO this shouldn't be ReviewParams but an ItemId+ViewId because a new item won't have a ReviewDate and we don't need the userId
+searchForExisting :: JRState.JRState -> Entity User -> [UserDeck.UserDeckCpt] -> Foundation.Handler (Maybe PresentationParams)
 
 -- descended to a terminal node (a TableView) so get the next card from it
-drillDownDeck throttle (UserDeck.TableView _ _ _ dataSource obverse _ : _) = getCurrentTime >>= showCardItem where
-	showCardItem now = return $ XML.Document standardPrologue (embed obverse) []
+searchForExisting site (Entity userId name) (UserDeck.TableView _ _ _ dataSource obverse _ : _) = YC.liftIO (getCurrentTime >>= showCardItem) where
+	showCardItem now = JRState.runFilteredLoggingT site (runSqlPool (dueItems userId now) (JRState.tablesFile site)) >>= return . fmap getItemAndViewIds . listToMaybe
+
+
+getItemAndViewIds :: Entity LearnDatum -> PresentationParams
+getItemAndViewIds (Entity i _) = (ExistingItem i, XML.Document standardPrologue (embed [XML.NodeContent "obverse side"]) [])
+
+
+searchForNew ::JRState.JRState ->  Entity User -> UserDeck.NewThrottle -> [UserDeck.UserDeckCpt] -> Foundation.Handler (Maybe PresentationParams)
+searchForNew site userParams throttle decks = YC.liftIO $ return Nothing
+
+
+setAndReturn :: PresentationParams -> Foundation.Handler YC.Html
+setAndReturn (itemId, document) = setSessionId itemId >> YC.liftIO (BZH.toHtml `fmap` return document)
+
+
+setSessionId :: ReviewParams -> Foundation.Handler ()
+setSessionId (ExistingItem itemId) = setSession itemIdKey (showt $ fromSqlKey itemId)
+setSessionId (NewItem view row) = setSession viewIdKey (showt $ fromSqlKey view) >> setSession rowIdKey (showt $ fromSqlKey row)
 
 
 mergeThrottle :: UserDeck.NewThrottle -> UserDeck.NewThrottle -> UserDeck.NewThrottle
 mergeThrottle Nothing newThrottle = newThrottle
 mergeThrottle already Nothing = already
-mergeThrottle (Just already) (Just newThrottle) = Just (if already < newThrottle then already else newThrottle)
+mergeThrottle a@(Just already) n@(Just newThrottle) = if already < newThrottle then a else n
 
 
-informationMessage :: DT.Text -> IO XML.Document
-informationMessage message = documentHTML [XML.NodeContent message]
+informationMessage :: DT.Text -> Foundation.Handler YC.Html
+informationMessage message = YC.liftIO $ fmap BZH.toHtml $ documentHTML [XML.NodeContent message]
 
 
 documentHTML :: [XML.Node] -> IO XML.Document
@@ -167,6 +167,12 @@ embed content =
 			]
 		]
 	]
+
+
+itemIdKey, viewIdKey, rowIdKey :: DT.Text
+itemIdKey =  "JR.item"
+viewIdKey = "JR.view"
+rowIdKey = "JR.row"
 
 
 oneSpace :: XML.Node

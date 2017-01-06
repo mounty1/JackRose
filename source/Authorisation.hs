@@ -8,17 +8,16 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, MultiParamTypeClasses, GADTs, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, MultiParamTypeClasses, GADTs, GeneralizedNewtypeDeriving, RankNTypes #-}
 
 
-module Authorisation (migrateData, User, UserId, Member) where
+module Authorisation (migrateData, User, mkUser, UserId, Member) where
 
 
 import qualified Yesod as Y
 import qualified Yesod.Auth.Account as YAA
 import qualified Data.ByteString as DB
 import qualified Data.Text as DT (Text, empty)
-
 
 Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
 User
@@ -34,6 +33,10 @@ Member
 	parent UserId NOT NULL
 	Membership child parent
 |]
+
+
+mkUser :: DT.Text -> Y.Unique User
+mkUser = UniqueUsername
 
 
 instance YAA.PersistUserCredentials User where

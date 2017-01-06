@@ -19,9 +19,9 @@ executable JackRose
                       fast-logger,
                       monad-logger,
                       monad-control,
-                      hsql,
-                      hsql-postgresql,
                       persistent-postgresql,
+                      HDBC,
+                      HDBC-postgresql,
                       smtp-mail,
                       ConfigFile,
                       mtl,
@@ -39,3 +39,29 @@ executable JackRose
                       persistent-template,
                       persistent-sqlite,
                       containers
+  other-modules:      Application
+                      AuthoriStyle
+                      Authorisation
+                      CommandArgs
+                      ConfigParse
+                      ConnectionData
+                      DataSource
+                      EmailVerification
+                      FailureMessage
+                      Foundation
+                      GoHome
+                      JRState
+                      LearningData
+                      LearningResync
+                      LogFilter
+                      LoginPlease
+                      LoginPost
+                      MaybeIntValue
+                      Persistency
+                      ReviewGet
+                      ReviewPost
+                      RouteData
+                      SiteConfigFromFile
+                      TextList
+                      UserDeck
+                      UserToId

@@ -11,7 +11,7 @@ Portability: undefined
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module Configure (siteObject) where
+module SiteConfigFromFile (siteObject) where
 
 
 import qualified Data.Text as DT (pack, empty, Text, unpack, concat, toLower)

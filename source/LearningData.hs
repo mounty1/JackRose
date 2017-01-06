@@ -14,10 +14,10 @@ History:  record of item scores.
 -}
 
 
-{-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving, RankNTypes #-}
 
 
-module LearningData (migrateData, DataSourceId, DataSource(..), DataRow(..), View(..), LearnDatum(..), dueItems, History(..)) where
+module LearningData (migrateData, DataSourceId, DataSource(..), DataRow(..), View(..), ViewId, DataRowId, LearnDatumId, LearnDatum(..), dueItems, History(..)) where
 
 
 import qualified Yesod as Y
@@ -25,8 +25,8 @@ import qualified Data.Text as DT (Text)
 import Authorisation (UserId)
 import Data.Int (Int8)
 import Data.Time (UTCTime)
-import Database.Persist (selectList, (<.))
-import qualified Database.Persist.Sql.Types.Internal (SqlBackend)
+import Database.Persist (selectList, (<.), (==.))
+import qualified Database.Persist.Sql (SqlBackend)
 import qualified Control.Monad.Trans.Reader (ReaderT)
 
 
@@ -49,9 +49,9 @@ View
 	sourceId DataSourceId NOT NULL
 	obverse DT.Text NOT NULL
 	reverse DT.Text NOT NULL
-	UniqueViewIndex viewUID sourceId
 LearnDatum
 	viewUID ViewId NOT NULL
+	itemId DataRowId NOT NULL
 	user UserId NOT NULL
 	nextReview UTCTime NOT NULL
 	UniqueLearnDatumIndex viewUID user
@@ -61,5 +61,7 @@ History
 	grade Int8 NOT NULL
 |]
 
-dueItems :: (Y.MonadIO m, Y.PersistQueryRead backend, Y.BaseBackend backend ~ Database.Persist.Sql.Types.Internal.SqlBackend) => UTCTime -> Control.Monad.Trans.Reader.ReaderT backend m [Y.Entity LearnDatum]
-dueItems stamp = selectList [ LearnDatumNextReview <. stamp ] []
+{- The modelling above means that LearnDatum refers to DataSource via both viewId and itemId.  'Obviously' those two references should be equal -}
+
+dueItems :: forall (m :: * -> *). Y.MonadIO m => UserId -> UTCTime -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
+dueItems user stamp = selectList [ LearnDatumNextReview <. stamp, LearnDatumUser ==. user ] []
