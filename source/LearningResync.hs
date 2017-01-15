@@ -43,8 +43,8 @@ import Control.Concurrent.STM.TVar (modifyTVar')
 import ConnectionData (DataDescriptor(..), DataHandle(..))
 
 
--- | Create handles or connections to all data sources;  then read them to be sure
--- | all records are known.
+-- | Create handles or connections to all data sources;
+-- | then read them to be sure all records are known.
 update :: JRState.JRState -> IO ()
 update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (JRState.tablesFile site)
 			-- convert the list of data-source rcords into a map of open connections
@@ -57,7 +57,7 @@ update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (
 			>>= liftIO . atomically . modifyTVar' (JRState.dataSchemes site) . (flip $ foldr $ uncurry DM.insert)
 
 
-type DataSchemes = [(DT.Text, ConnectionData.DataDescriptor)]
+type DataSchemes = [(DT.Text, DataDescriptor)]
 
 
 updateOneSource :: JRState.JRState -> LoggingT IO DataSchemes -> Entity LearningData.DataSource -> LoggingT IO DataSchemes
@@ -72,7 +72,7 @@ updateOneSource site schemeMap sourceRecord = maybe badConnString mkConnection (
 	reSyncRows :: OpenDataSource -> LoggingT IO DataSchemes
 	reSyncRows (Unavailable justification) = logWarnNS dataShortString justification >> schemeMap
 	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO getCurrentTime >>= updateSync
-				>> schemeMap >>= liftIO . return . (:) (dataShortString, (DataDescriptor dataLongString colheads dataSourceKey openConn)) where
+				>> schemeMap >>= liftIO . return . (:) (dataShortString, DataDescriptor colheads dataSourceKey openConn) where
 		updateSync timeStamp = liftIO (reSyncOneSource openConn site colheads timeStamp priKeys dataSourceKey learningPersistPool) >>= updateSource timeStamp
 		--update time-stamp only replace if new data_rows were inserted.
 		updateSource timeStamp True = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool

@@ -13,6 +13,7 @@ module UserDeck where
 
 import Data.Text (Text)
 import Text.XML (Node)
+import LearningData (ViewId)
 import ConnectionData (DataDescriptor)
 
 
@@ -29,8 +30,8 @@ data UserDeckCpt =
 	TableView {
 		throttle :: NewThrottle,
 		shuffle :: Bool,
-		vid :: Text, -- ^ view identifier
-		dataSource :: DataDescriptor,
+		vid :: ViewId,
+		handle :: DataDescriptor,
 		obverse :: [Node],
 		backside :: [Node]
 	}

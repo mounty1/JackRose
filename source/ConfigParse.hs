@@ -31,6 +31,7 @@ import Data.Either (partitionEithers)
 import Control.Monad.Logger (LoggingT, logWarnNS, logDebugNS, logErrorNS)
 import MaybeIntValue (maybeIntValue)
 import qualified UserDeck (UserDeckCpt(..))
+import LearningData (mkViewKey)
 
 
 -- | Version of the configuration file schema.  This is incremented only
@@ -186,7 +187,7 @@ schemaItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children
 		>>= \([idy, source], [maybeLimit, maybeShuffle]) -> maybe
 				(failToParse context (source : ": " : invalidItem))
 				(\conn -> 
-					(\(front, back) -> UserDeck.TableView (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) idy conn front back : schema)
+					(\(front, back) -> UserDeck.TableView (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) (mkViewKey idy) conn front back : schema)
 						`fmap` viewItem context attrs (Nothing, Nothing) children)
 				(DM.lookup source (dataSchemes context)) where
 

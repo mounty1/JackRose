@@ -25,20 +25,16 @@ import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, getUserConfig, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle, obverse)
-import LearningData (ViewId, DataRowId, LearnDatumId, LearnDatum(..), dueItems)
+import LearningData (ViewId, LearnDatumId, LearnDatum(..), dueItems, getViewKey, getDataRowKey, getLearnDatumKey)
 import Data.Time (getCurrentTime)
 import UserToId (userToId)
 import Authorisation (User)
 import Database.Persist.Sqlite (runSqlPool)
-import TextShow (showt)
 import Data.Maybe (listToMaybe)
-import Database.Persist.Sql (Entity(Entity), fromSqlKey)
+import Database.Persist.Sql (Entity(Entity))
 
 
-data ReviewParams = ExistingItem LearnDatumId | NewItem ViewId DataRowId
-
-
-type PresentationParams = (ReviewParams, XML.Document)
+type PresentationParams = (LearnDatumId, XML.Document)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -65,14 +61,14 @@ splitSlash = DL.filter (not . DT.null) . DT.split (== '/')
 
 descendToDeckRoot :: JRState.JRState -> Entity User -> UserDeck.NewThrottle -> [DT.Text] -> [UserDeck.UserDeckCpt] -> Foundation.Handler YC.Html
 
+-- Still nodes to descend in requested sub-tree, but nowhere to go
+descendToDeckRoot _ _ _ _ [] = informationMessage "nowhere to go"
+
 -- If XPath-like spec. is empty then 'stuff' is the requested sub-tree so pick an item to display.
 -- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
 -- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
 -- which is the daily (well, sliding 24 hour window) limit on new cards.
-descendToDeckRoot site userParams throttle [] stuff = searchForExisting site userParams stuff >>= maybe (searchForNew site userParams throttle stuff >>= maybe (informationMessage "no more items") setAndReturn) setAndReturn
-
--- Still nodes to descend in requested sub-tree, but nowhere to go
-descendToDeckRoot _ _ _ _ [] = informationMessage "nowhere to go"
+descendToDeckRoot site userParams throttle [] (stuff : _) = searchForExistingByTable site userParams stuff >>= maybe (searchForNew site userParams throttle stuff >>= maybe (informationMessage "no more items") setAndReturn) setAndReturn
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
 descendToDeckRoot site userParams throttle deckPath@(d1 : dn) (UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
@@ -83,29 +79,34 @@ descendToDeckRoot site userParams throttle deckPath@(d1 : dn) (UserDeck.SubDeck 
 descendToDeckRoot site userParams throttle deckPath (_ : rest) = descendToDeckRoot site userParams throttle deckPath rest
 
 
--- TODO this shouldn't be ReviewParams but an ItemId+ViewId because a new item won't have a ReviewDate and we don't need the userId
-searchForExisting :: JRState.JRState -> Entity User -> [UserDeck.UserDeckCpt] -> Foundation.Handler (Maybe PresentationParams)
+-- TODO document
+searchForExistingByTable :: JRState.JRState -> Entity User -> UserDeck.UserDeckCpt -> Foundation.Handler (Maybe PresentationParams)
 
 -- descended to a terminal node (a TableView) so get the next card from it
-searchForExisting site (Entity userId name) (UserDeck.TableView _ _ _ dataSource obverse _ : _) = YC.liftIO (getCurrentTime >>= showCardItem) where
-	showCardItem now = JRState.runFilteredLoggingT site (runSqlPool (dueItems userId now) (JRState.tablesFile site)) >>= return . fmap getItemAndViewIds . listToMaybe
+searchForExistingByTable site (Entity userId name) tableTree =YC.liftIO $ getCurrentTime >>= showCardItem where
+	showCardItem now = JRState.runFilteredLoggingT site (runSqlPool (dueItems userId now (tableList tableTree)) (JRState.tablesFile site)) >>= return . fmap getItemAndViewIds . listToMaybe
+
+
+tableList :: UserDeck.UserDeckCpt -> [ViewId]
+tableList (UserDeck.TableView _ _ vid _ _ _) = [vid]
+tableList (UserDeck.SubDeck _ _ _ dex) = concatMap tableList dex
+
 
 
 getItemAndViewIds :: Entity LearnDatum -> PresentationParams
-getItemAndViewIds (Entity i _) = (ExistingItem i, XML.Document standardPrologue (embed [XML.NodeContent "obverse side"]) [])
+getItemAndViewIds (Entity i _) = (i, XML.Document standardPrologue (embed [XML.NodeContent "obverse side"]) [])
 
 
-searchForNew ::JRState.JRState ->  Entity User -> UserDeck.NewThrottle -> [UserDeck.UserDeckCpt] -> Foundation.Handler (Maybe PresentationParams)
-searchForNew site userParams throttle decks = YC.liftIO $ return Nothing
+searchForNew ::JRState.JRState ->  Entity User -> UserDeck.NewThrottle -> UserDeck.UserDeckCpt -> Foundation.Handler (Maybe PresentationParams)
+searchForNew site userParams throttle deck = YC.liftIO $ return Nothing
 
 
 setAndReturn :: PresentationParams -> Foundation.Handler YC.Html
-setAndReturn (itemId, document) = setSessionId itemId >> YC.liftIO (BZH.toHtml `fmap` return document)
-
-
-setSessionId :: ReviewParams -> Foundation.Handler ()
-setSessionId (ExistingItem itemId) = setSession itemIdKey (showt $ fromSqlKey itemId)
-setSessionId (NewItem view row) = setSession viewIdKey (showt $ fromSqlKey view) >> setSession rowIdKey (showt $ fromSqlKey row)
+setAndReturn (item, document) = setSession viewIdKey (getViewKey viewId)
+		>> setSession rowIdKey dataKey
+		>> YC.liftIO (BZH.toHtml `fmap` return document) where
+		(viewId, rowId, _) = getLearnDatumKey item
+		(dataKey, _) = getDataRowKey rowId
 
 
 mergeThrottle :: UserDeck.NewThrottle -> UserDeck.NewThrottle -> UserDeck.NewThrottle
@@ -169,8 +170,7 @@ embed content =
 	]
 
 
-itemIdKey, viewIdKey, rowIdKey :: DT.Text
-itemIdKey =  "JR.item"
+viewIdKey, rowIdKey :: DT.Text
 viewIdKey = "JR.view"
 rowIdKey = "JR.row"
 

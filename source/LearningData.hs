@@ -7,17 +7,34 @@ Stability: experimental
 Portability: undefined
 
 DataSource: reference to some database table or flat file.
-DataRow:  in Anki parlance, a note.
+DataRow:  in Anki parlance, a note;  one table row.
 View: 'card':  display information * data row
-LearnDatum:  card * user.
+LearnDatum:  card * datarow * user.
 History:  record of item scores.
 -}
 
 
-{-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving, RankNTypes #-}
+{-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving, RankNTypes, FlexibleInstances, DeriveGeneric #-}
 
 
-module LearningData (migrateData, DataSourceId, DataSource(..), DataRow(..), View(..), ViewId, DataRowId, LearnDatumId, LearnDatum(..), dueItems, History(..)) where
+module LearningData (migrateData,
+		DataSourceId,
+		DataSource(..),
+		DataRow(..),
+		View(..),
+		ViewId,
+		DataRowId,
+		LearnDatumId,
+		LearnDatum(..),
+		dueItems,
+		History(..),
+		getDataRow,
+		mkViewKey,
+		getViewKey,
+		mkDataRowKey,
+		getDataRowKey,
+		mkLearnDatumKey,
+		getLearnDatumKey) where
 
 
 import qualified Yesod as Y
@@ -25,7 +42,7 @@ import qualified Data.Text as DT (Text)
 import Authorisation (UserId)
 import Data.Int (Int8)
 import Data.Time (UTCTime)
-import Database.Persist (selectList, (<.), (==.))
+import Database.Persist (selectList, (<.), (==.), (<-.), SelectOpt(LimitTo) )
 import qualified Database.Persist.Sql (SqlBackend)
 import qualified Control.Monad.Trans.Reader (ReaderT)
 
@@ -40,28 +57,58 @@ DataSource
 	resynced UTCTime NOT NULL
 	ByName shortName
 DataRow
-	key DT.Text NOT NULL
+	tableKey DT.Text NOT NULL
 	dataSourceRowId DataSourceId NOT NULL
 	loaded UTCTime NOT NULL
-	UniqueRowIndex key dataSourceRowId
+	Primary tableKey dataSourceRowId
 View
-	viewUID DT.Text NOT NULL
-	sourceId DataSourceId NOT NULL
+	uid DT.Text NOT NULL
+	dataSourceId DataSourceId NOT NULL
 	obverse DT.Text NOT NULL
 	reverse DT.Text NOT NULL
+	Primary uid
 LearnDatum
 	viewUID ViewId NOT NULL
 	itemId DataRowId NOT NULL
 	user UserId NOT NULL
 	nextReview UTCTime NOT NULL
-	UniqueLearnDatumIndex viewUID user
+	Primary viewUID itemId user
 History
 	item LearnDatumId NOT NULL
 	stamp UTCTime NOT NULL
 	grade Int8 NOT NULL
+	Primary item stamp
 |]
 
-{- The modelling above means that LearnDatum refers to DataSource via both viewId and itemId.  'Obviously' those two references should be equal -}
+{- if Views are not associated with DataSources, how do we know which Views go with which DataSources ? -}
 
-dueItems :: forall (m :: * -> *). Y.MonadIO m => UserId -> UTCTime -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
-dueItems user stamp = selectList [ LearnDatumNextReview <. stamp, LearnDatumUser ==. user ] []
+dueItems :: forall (m :: * -> *). Y.MonadIO m => UserId -> UTCTime -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
+dueItems user stamp views = selectList [ LearnDatumNextReview <. stamp, LearnDatumUser ==. user, LearnDatumViewUID <-. views ] [ LimitTo 1 ]
+
+
+getDataRow :: Y.MonadIO m => DataRowId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend DataRow) m (Maybe DataRow)
+getDataRow dataRowId = Y.get dataRowId
+
+
+mkViewKey :: DT.Text -> Y.Key View
+mkViewKey item = ViewKey { unViewKey = item }
+
+
+getViewKey :: Y.Key View -> DT.Text
+getViewKey item = unViewKey item
+
+
+mkDataRowKey :: DT.Text -> DataSourceId -> Y.Key DataRow
+mkDataRowKey k d = DataRowKey k d
+
+
+getDataRowKey :: Y.Key DataRow -> (DT.Text, DataSourceId)
+getDataRowKey (DataRowKey k d) = (k, d)
+
+
+mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Key LearnDatum
+mkLearnDatumKey v i u = LearnDatumKey v i u
+
+
+getLearnDatumKey :: Y.Key LearnDatum -> (ViewId, DataRowId, UserId)
+getLearnDatumKey (LearnDatumKey v i u) = (v, i, u)

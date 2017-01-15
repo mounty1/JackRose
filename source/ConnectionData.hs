@@ -17,10 +17,9 @@ import LearningData (DataSourceId)
 
 
 data DataDescriptor = DataDescriptor {
-	descriptiveName :: Text,
 	columnNames :: [Text],
 	sourceId :: DataSourceId,
-	openConnection :: DataHandle
+	openConnection :: DataHandle	-- the connection is specified by the DataSourceId, but this is the opened handle
 }
 
 
