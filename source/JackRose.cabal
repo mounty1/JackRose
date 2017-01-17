@@ -29,6 +29,7 @@ executable JackRose
                       transformers,
                       text-show,
                       time,
+                      MissingH,
                       xml,
                       xml-conduit,
                       filepath,

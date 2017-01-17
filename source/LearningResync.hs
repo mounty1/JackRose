@@ -21,7 +21,7 @@ import Data.Time (getCurrentTime, UTCTime)
 import Control.Exception (catch)
 import Data.List (foldl', intersperse)
 import qualified Data.Map as DM (insert)
-import qualified Data.Text as DT (Text, concat, empty, pack, unpack)
+import qualified Data.Text as DT (Text, concat, pack, unpack)
 import qualified Database.Persist.Class (Key)
 import Database.Persist.Sql (Entity)
 import Database.Persist.Sqlite (ConnectionPool, runSqlPool, selectList)
@@ -32,7 +32,7 @@ import DataSource (deSerialise)
 import TextList (enSerialise)
 import Data.Maybe (fromMaybe)
 import qualified JRState (JRState(..), runFilteredLoggingT)
-import qualified LearningData (DataSource(..), DataRow(..))
+import qualified LearningData (DataSource(..), DataRow(..), DataSourceId)
 import qualified DataSource as DS (DataVariant(..))
 import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable, prepare, sFetchAllRows)
 import Database.HDBC.PostgreSQL (connectPostgreSQL)
@@ -57,22 +57,22 @@ update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (
 			>>= liftIO . atomically . modifyTVar' (JRState.dataSchemes site) . (flip $ foldr $ uncurry DM.insert)
 
 
-type DataSchemes = [(DT.Text, DataDescriptor)]
+type DataSchemes = [(LearningData.DataSourceId, DataDescriptor)]
 
 
 updateOneSource :: JRState.JRState -> LoggingT IO DataSchemes -> Entity LearningData.DataSource -> LoggingT IO DataSchemes
 
 updateOneSource site schemeMap sourceRecord = maybe badConnString mkConnection (deSerialise dataSourceString) where
 
-	badConnString = logWarnNS dataShortString (DT.concat [DT.pack "Invalid data source: ", dataSourceString]) >> schemeMap
+	badConnString = logWarnNS dataNameString (DT.concat [DT.pack "Invalid data source: ", dataSourceString]) >> schemeMap
 
 	mkConnection :: DS.DataVariant -> LoggingT IO DataSchemes
 	mkConnection connClass = liftIO (connection site connClass) >>= reSyncRows
 
 	reSyncRows :: OpenDataSource -> LoggingT IO DataSchemes
-	reSyncRows (Unavailable justification) = logWarnNS dataShortString justification >> schemeMap
+	reSyncRows (Unavailable justification) = logWarnNS dataNameString justification >> schemeMap
 	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO getCurrentTime >>= updateSync
-				>> schemeMap >>= liftIO . return . (:) (dataShortString, DataDescriptor colheads dataSourceKey openConn) where
+				>> schemeMap >>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn) where
 		updateSync timeStamp = liftIO (reSyncOneSource openConn site colheads timeStamp priKeys dataSourceKey learningPersistPool) >>= updateSource timeStamp
 		--update time-stamp only replace if new data_rows were inserted.
 		updateSource timeStamp True = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool
@@ -82,8 +82,7 @@ updateOneSource site schemeMap sourceRecord = maybe badConnString mkConnection (
 	dataSourceKey = entityKey sourceRecord
 	dataSourceParts = entityVal sourceRecord
 	dataSourceString = LearningData.dataSourceSourceSerial dataSourceParts
-	dataShortString = LearningData.dataSourceShortName dataSourceParts
-	dataLongString = LearningData.dataSourceLongName dataSourceParts
+	dataNameString = LearningData.dataSourceName dataSourceParts
 
 
 data OpenDataSource = OpenDataSource DataHandle [DT.Text] [DT.Text] | Unavailable DT.Text
@@ -117,11 +116,11 @@ connection :: JRState.JRState -> DS.DataVariant -> IO OpenDataSource
 
 connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybeUser maybePassword) = catch (neoConn >>= pullStructure) sourceFail where
 	neoConn = connectPostgreSQL $
-			"host=" ++ DT.unpack serverIP ++
-			maybe "" (makeLabel " port=") maybePort ++
-			" dbname=" ++ DT.unpack dbase ++
+			"host=" ++ DT.unpack serverIP ++ "" ++
+			maybe "" (makeLabel " port") maybePort ++
+			maybe "" (\db -> makeLabel " dbname" (DT.unpack db)) dbase ++
 			" user=" ++ (DT.unpack $ fromMaybe (JRState.databaseUser site) maybeUser) ++
-			" password=" ++ (DT.unpack $ fromMaybe DT.empty maybePassword)
+			maybe "" (\pw -> makeLabel " password" (DT.unpack pw)) maybePassword
 	pullStructure conn = HDBC.describeTable conn tableNameStr >>= mashIntoFields conn
 	mashIntoFields conn rows = HDBC.prepare conn primyKeyQuery >>= HDBC.sFetchAllRows >>=return . maybe [] (map DT.pack) . sequence . map head >>= return . zing where
 		zing primKeys = OpenDataSource (Postgres conn dataTable) (map putColHead rows) primKeys
@@ -129,7 +128,7 @@ connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybe
 	sourceFail = return . Unavailable . DT.pack . show
 	primyKeyQuery = "SELECT \"" ++ attName ++ "\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass ORDER BY a.attnum;"
 	tableNameStr = DT.unpack dataTable
-	makeLabel label value = label ++ show value
+	makeLabel label value = label ++ "=\"" ++ show value ++ "\""
 
 connection _ (DS.Sqlite3 dtableName) = return $ OpenDataSource (ConnectionData.Sqlite3 dtableName) [] []
 

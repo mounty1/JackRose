@@ -19,7 +19,6 @@ import qualified Yesod.Auth as YA ()
 import qualified Yesod.Routes.TH.Types as YT
 
 
--- | this is still a magic black box
 routeData :: [YT.ResourceTree String]
 routeData = [YC.parseRoutes|
 	/ HomeR GET POST

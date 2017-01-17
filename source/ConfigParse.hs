@@ -14,7 +14,7 @@ encountered, the definition of our monad means that evaluation backs out immedia
 -}
 
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 
 module ConfigParse (SchemaParsing, content) where
@@ -31,7 +31,8 @@ import Data.Either (partitionEithers)
 import Control.Monad.Logger (LoggingT, logWarnNS, logDebugNS, logErrorNS)
 import MaybeIntValue (maybeIntValue)
 import qualified UserDeck (UserDeckCpt(..))
-import LearningData (mkViewKey)
+import LearningData (mkViewKey, getView, View(..))
+import Database.Persist.Sqlite (ConnectionPool, runSqlPool)
 
 
 -- | Version of the configuration file schema.  This is incremented only
@@ -72,12 +73,21 @@ type SchemaParsing = ParsingResult [UserDeck.UserDeckCpt]
 type Attributes = DM.Map XML.Name DT.Text
 
 
+-- TODO we should probably be using ReaderT to pass this around.
 data XMLFileContext = XMLFileContext {
 	nodes :: [DT.Text],
 	views :: [DT.Text],
-	shuffle :: Bool,
+	siteConfig :: JRState.JRState,
 	dataSchemes :: JRState.DataSchemes
 }
+
+
+store :: XMLFileContext -> ConnectionPool
+store = JRState.tablesFile . siteConfig
+
+
+shuffle :: XMLFileContext -> Bool
+shuffle = JRState.shuffleCards . siteConfig
 
 
 logSource :: DT.Text
@@ -102,13 +112,13 @@ content' sourceName (XML.Document _ top@(XML.Element (XML.Name "jackrose" Nothin
 				contents context children []
 			else
 				failToParse context ["version=\"", version, "\" not \"", documentVersionText, "\""] where
-	context = mkContext top sourceName (JRState.shuffleCards site) dSchemes
+	context = mkContext top sourceName site dSchemes
 
-content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) _ dSchemes =
-	failToParse (mkContext top sourceName False dSchemes) ["document not jackrose"]
+content' sourceName (XML.Document _ top@(XML.Element (XML.Name _ _ _) _ _) _) site dSchemes =
+	failToParse (mkContext top sourceName site dSchemes) ["document not jackrose"]
 
 
-mkContext :: XML.Element -> DT.Text -> Bool -> JRState.DataSchemes -> XMLFileContext
+mkContext :: XML.Element -> DT.Text -> JRState.JRState -> JRState.DataSchemes -> XMLFileContext
 mkContext top sourceName = XMLFileContext [ tagText top, "File=" `DT.append` sourceName ] []
 
 
@@ -121,7 +131,7 @@ failToParse context message = ParsingResult $ logErrorNS logSource stream >> (re
 
 
 failAllButBlank :: XMLFileContext -> DT.Text -> a -> ParsingResult a
-failAllButBlank context text allow = if DT.all DC.isSpace text then return allow else failToParse context invalidItem
+failAllButBlank context text allow = if DT.all DC.isSpace text then return allow else failToParse context ["out of place"]
 
 
 -- show Element
@@ -183,15 +193,20 @@ schemaItem context (XML.Element (XML.Name "deck" Nothing Nothing) attrs children
 		>>= \([name], [maybeLimit, maybeShuffle]) -> (\ss -> UserDeck.SubDeck (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) name ss : schema) `fmap` contents context{views = name : views context} children []
 
 schemaItem context (XML.Element (XML.Name "view" Nothing Nothing) attrs children) schema =
-	attrList context attrs ["UID", "source"] ["limit", "shuffle"]
-		>>= \([idy, source], [maybeLimit, maybeShuffle]) -> maybe
-				(failToParse context (source : ": " : invalidItem))
-				(\conn -> 
-					(\(front, back) -> UserDeck.TableView (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) (mkViewKey idy) conn front back : schema)
-						`fmap` viewItem context attrs (Nothing, Nothing) children)
-				(DM.lookup source (dataSchemes context)) where
+	attrList context attrs ["UID"] ["limit", "shuffle"]
+		>>= \([idy], [maybeLimit, maybeShuffle]) ->
+			itemToView idy >>=
+				(\view -> maybe
+					(failToParse context (idy : [": no such data-source"]))
+					(\conn -> 
+						(\(front, back) -> UserDeck.TableView (maybeLimit >>= maybeIntValue) (reshuffle (shuffle context) maybeShuffle) (mkViewKey idy) conn front back : schema)
+							`fmap` viewItem context attrs (Nothing, Nothing) children)
+					(DM.lookup (viewDataSourceId view) (dataSchemes context))) where
+			itemToView :: DT.Text -> ParsingResult View
+			itemToView idy = ParsingResult $ fmap (maybe (Left  $ DT.concat [ idy, ": no such view"]) Right) $ JRState.runFilteredLoggingT (siteConfig context) (runSqlPool (getView idy) (store context))
 
-schemaItem context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
+
+schemaItem context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : [": only \"view\" allowed here"])
 
 
 type CardFaces = (Maybe [XML.Node], Maybe [XML.Node])
@@ -205,13 +220,12 @@ viewItem context lattrs pair (XML.NodeElement element : xs) = viewPart (tagStack
 viewItem context lattrs pair (XML.NodeInstruction _ : xs) = viewItem context lattrs pair xs
 viewItem context lattrs pair (XML.NodeComment _ : xs) = viewItem context lattrs pair xs
 viewItem context lattrs pair (XML.NodeContent text : xs) = viewItem context lattrs pair xs >>= failAllButBlank context text
-viewItem context _ _ [] = failToParse context invalidItem
+viewItem context _ _ [] = failToParse context ["exactly one front and one back expected"]
 
 
-dupInView, extraAttributes, invalidItem :: [DT.Text]
+dupInView, extraAttributes :: [DT.Text]
 dupInView = ["duplicate in view"]
 extraAttributes = ["attributes given"]
-invalidItem = ["invalid item"]
 
 
 -- Parse @<tag>@s within a @<view>@;  there should be just one each of @<front>@ and @<back>@
@@ -227,7 +241,7 @@ viewPart context (XML.Element (XML.Name "back" Nothing Nothing) attrs children) 
 
 viewPart context (XML.Element (XML.Name "back" Nothing Nothing) _ _) (Just _, _) = failToParse context dupInView
 
-viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : ": " : invalidItem)
+viewPart context (XML.Element (XML.Name other _ _) _ _) _ = failToParse context (other : [": only \"front\" and \"back\" allowed"])
 
 
 -- given a list of attributes, and a list of attribute names, return either:

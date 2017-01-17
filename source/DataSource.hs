@@ -26,7 +26,7 @@ data DataSource = DataSource DT.Text DT.Text DataVariant
 
 -- | All the details to identify a data source without actually opening a connection to it.
 data DataVariant
-	= Postgres { server :: DT.Text, port :: Maybe Int, database :: DT.Text, namespace :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
+	= Postgres { server :: DT.Text, port :: Maybe Int, database ::Maybe  DT.Text, namespace :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
 	| Sqlite3 { tableName :: DT.Text }
 	| CSV { separator :: Char, fileCSV :: DT.Text }
 	| XMLSource { fileXML :: DT.Text }
@@ -41,7 +41,7 @@ showMT = maybe DT.empty id
 
 
 enSerialise :: DataVariant -> DT.Text
-enSerialise (Postgres serverIP portNo dbase nameSpace dtable userName passWord) = DL.enSerialise [ "P", serverIP, showMI portNo, dbase, showMT nameSpace, dtable, showMT userName, showMT passWord ]
+enSerialise (Postgres serverIP portNo dbase nameSpace dtable userName passWord) = DL.enSerialise [ "P", serverIP, showMI portNo, showMT dbase, showMT nameSpace, dtable, showMT userName, showMT passWord ]
 enSerialise (Sqlite3 dtableName) = DL.enSerialise [ "Q", dtableName ]
 enSerialise (CSV recseparator ffileCSV) = DL.enSerialise [ "C", DT.singleton recseparator, ffileCSV ]
 enSerialise (XMLSource ffileXML) = DL.enSerialise [ "X", ffileXML ]
@@ -52,11 +52,11 @@ deSerialise = deSerialise' . DL.deSerialise
 
 
 deSerialise' :: [DT.Text] -> Maybe DataVariant
-deSerialise' [ "P", serverIP, maybePort, dbase, maybeNamespace, dtable, maybeUsername, maybePassword ] =
+deSerialise' [ "P", serverIP, maybePort, maybeDBase, maybeNamespace, dtable, maybeUsername, maybePassword ] =
 		Just $ Postgres
 			serverIP
 			(maybeIntValue maybePort)
-			dbase
+			(if DT.null maybeDBase then Nothing else Just maybeDBase)
 			(if DT.null maybeNamespace then Nothing else Just maybeNamespace)
 			dtable
 			(if DT.null maybeUsername then Nothing else Just maybeUsername)

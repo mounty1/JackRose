@@ -31,7 +31,6 @@ User
 Member
 	child UserId NOT NULL
 	parent UserId NOT NULL
-	Membership child parent
 |]
 
 

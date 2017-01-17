@@ -52,12 +52,13 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \t -> atomically (newTVar
 
 		-- accumulate up the fields of the site object, one by one.
 		-- the list of configuration key values is of course static, but subject to maintenance.
+		-- Don't try to read anything in class Read because the parser expects quotation marks around it
 		makeAppObject :: PerstQ.ConnectionPool -> IO JRState.JRState
 		makeAppObject pool = spliceShared (almostAppObject pool) (DC.options configuration defaultSection)
 		almostAppObject pool =
 			extractConfItem authory AuthoriStyle.Email "trustedSite" $
 				extractConfTextItem DT.empty "appRoot" $
-					extractConfItem id "jackrose" "dbuser" $
+					extractConfTextItem (DT.pack "jackrose") "dbuser" $
 						extractConfItem id "jackrose.aes" "keysFile" $
 							extractConfTextItem "users/" "userDir" $
 								extractConfTextItem "default.cfg" "userTemplate" $
@@ -95,8 +96,8 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \t -> atomically (newTVar
 	configLogName = DT.pack configName
 
 
-logValue :: DT.Text -> LogLevel
-logValue word = DMy.fromMaybe defaultLogLevel (lookup (DT.toLower word) debugLevels)
+logValue :: String -> LogLevel
+logValue word = DMy.fromMaybe defaultLogLevel (lookup (DT.toLower $ DT.pack word) debugLevels)
 
 
 debugLevels :: [(DT.Text, LogLevel)]

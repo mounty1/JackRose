@@ -22,9 +22,10 @@ import Control.Monad.Logger (LoggingT, LogLevel)
 import Control.Monad.IO.Class (MonadIO)
 import LogFilter (runFilteredLoggingT)
 import ConnectionData (DataDescriptor)
+import LearningData (DataSourceId)
 
 
-type DataSchemes = Map Text DataDescriptor
+type DataSchemes = Map DataSourceId DataDescriptor
 
 
 type UserConfig = Map Text [UserDeckCpt]

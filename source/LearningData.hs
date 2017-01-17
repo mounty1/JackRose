@@ -28,7 +28,7 @@ module LearningData (migrateData,
 		LearnDatum(..),
 		dueItems,
 		History(..),
-		getDataRow,
+		getView,
 		mkViewKey,
 		getViewKey,
 		mkDataRowKey,
@@ -51,11 +51,9 @@ Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCa
 DataSource
 	accessorWrite UserId NOT NULL
 	accessorRead UserId NOT NULL
-	shortName DT.Text UNIQUE NOT NULL
-	longName DT.Text
+	name DT.Text UNIQUE NOT NULL
 	sourceSerial DT.Text UNIQUE NOT NULL
 	resynced UTCTime NOT NULL
-	ByName shortName
 DataRow
 	tableKey DT.Text NOT NULL
 	dataSourceRowId DataSourceId NOT NULL
@@ -86,8 +84,12 @@ dueItems :: forall (m :: * -> *). Y.MonadIO m => UserId -> UTCTime -> [Y.Key Vie
 dueItems user stamp views = selectList [ LearnDatumNextReview <. stamp, LearnDatumUser ==. user, LearnDatumViewUID <-. views ] [ LimitTo 1 ]
 
 
-getDataRow :: Y.MonadIO m => DataRowId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend DataRow) m (Maybe DataRow)
+getDataRow :: forall (m :: * -> *). Y.MonadIO m => DataRowId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend DataRow) m (Maybe DataRow)
 getDataRow dataRowId = Y.get dataRowId
+
+
+getView :: forall (m :: * -> *). Y.MonadIO m => DT.Text -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend View) m (Maybe View)
+getView = Y.get . mkViewKey
 
 
 mkViewKey :: DT.Text -> Y.Key View
@@ -95,7 +97,7 @@ mkViewKey item = ViewKey { unViewKey = item }
 
 
 getViewKey :: Y.Key View -> DT.Text
-getViewKey item = unViewKey item
+getViewKey = unViewKey
 
 
 mkDataRowKey :: DT.Text -> DataSourceId -> Y.Key DataRow
