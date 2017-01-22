@@ -20,7 +20,7 @@ import Database.Persist (getBy)
 import Database.Persist.Sqlite (runSqlPool)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Trans.Control (MonadBaseControl)
-import Yesod (Entity)
+import Database.Persist.Sql (Entity)
 import qualified Data.Text as DT (Text)
 
 

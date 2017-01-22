@@ -19,6 +19,6 @@ import qualified Data.Text as DT (Text)
 import qualified Foundation (Handler)
 
 
--- | show next item for review, for the logged-in user
+-- | show failure as a web page
 page :: DT.Text -> Foundation.Handler YC.Html
 page msg = YC.defaultLayout [YC.whamlet|<H1>#{msg}|]

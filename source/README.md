@@ -64,3 +64,5 @@ https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29_Prevention
 
 - No 'do'.
 - single tab indentation.
+- Filenames ending in -Data.hs are persistent TH tables and minimal supporting code.
+- Filenames ending in -Spec.hs are in-memory representations derived or obtained therefrom.

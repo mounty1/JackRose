@@ -29,8 +29,6 @@ module LearningData (migrateData,
 		dueItems,
 		History(..),
 		getView,
-		mkViewKey,
-		getViewKey,
 		mkDataRowKey,
 		getDataRowKey,
 		mkLearnDatumKey,
@@ -60,11 +58,10 @@ DataRow
 	loaded UTCTime NOT NULL
 	Primary tableKey dataSourceRowId
 View
-	uid DT.Text NOT NULL
+	name DT.Text NOT NULL
 	dataSourceId DataSourceId NOT NULL
 	obverse DT.Text NOT NULL
 	reverse DT.Text NOT NULL
-	Primary uid
 LearnDatum
 	viewUID ViewId NOT NULL
 	itemId DataRowId NOT NULL
@@ -78,30 +75,21 @@ History
 	Primary item stamp
 |]
 
-{- if Views are not associated with DataSources, how do we know which Views go with which DataSources ? -}
 
 dueItems :: forall (m :: * -> *). Y.MonadIO m => UserId -> UTCTime -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
 dueItems user stamp views = selectList [ LearnDatumNextReview <. stamp, LearnDatumUser ==. user, LearnDatumViewUID <-. views ] [ LimitTo 1 ]
 
 
 getDataRow :: forall (m :: * -> *). Y.MonadIO m => DataRowId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend DataRow) m (Maybe DataRow)
-getDataRow dataRowId = Y.get dataRowId
+getDataRow = Y.get
 
 
-getView :: forall (m :: * -> *). Y.MonadIO m => DT.Text -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend View) m (Maybe View)
-getView = Y.get . mkViewKey
-
-
-mkViewKey :: DT.Text -> Y.Key View
-mkViewKey item = ViewKey { unViewKey = item }
-
-
-getViewKey :: Y.Key View -> DT.Text
-getViewKey = unViewKey
+getView :: forall (m :: * -> *). Y.MonadIO m => ViewId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend View) m (Maybe View)
+getView = Y.get
 
 
 mkDataRowKey :: DT.Text -> DataSourceId -> Y.Key DataRow
-mkDataRowKey k d = DataRowKey k d
+mkDataRowKey = DataRowKey
 
 
 getDataRowKey :: Y.Key DataRow -> (DT.Text, DataSourceId)
@@ -109,7 +97,7 @@ getDataRowKey (DataRowKey k d) = (k, d)
 
 
 mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Key LearnDatum
-mkLearnDatumKey v i u = LearnDatumKey v i u
+mkLearnDatumKey = LearnDatumKey
 
 
 getLearnDatumKey :: Y.Key LearnDatum -> (ViewId, DataRowId, UserId)

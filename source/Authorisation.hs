@@ -11,7 +11,7 @@ Portability: undefined
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, MultiParamTypeClasses, GADTs, GeneralizedNewtypeDeriving, RankNTypes #-}
 
 
-module Authorisation (migrateData, User, mkUser, UserId, Member) where
+module Authorisation (migrateData, User, UserId, mkUser) where
 
 
 import qualified Yesod as Y

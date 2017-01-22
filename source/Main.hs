@@ -17,6 +17,7 @@ module Main (main) where
 import qualified Yesod as Y (warp)
 import qualified Authorisation (migrateData)
 import qualified LearningData (migrateData)
+import qualified DeckData (migrateData)
 import qualified Persistency (upgradeDB)
 import qualified CommandArgs (args)
 import qualified JRState (JRState(..))
@@ -30,13 +31,13 @@ import SiteConfigFromFile (siteObject)
 main :: IO ()
 -- | Turn the command line arguments into an easily-queried object,
 -- use that to inform the construction of the foundation siteObject,
--- check that the authorised users table is in the current format,
+-- perform any required data migrations,
 -- and hand over to Warp, to launch the service.
 main = CommandArgs.args >>= siteObject >>= letsGo
 
 
 letsGo :: JRState.JRState -> IO ()
 letsGo site =
-	mapM_ (Persistency.upgradeDB (JRState.tablesFile site)) [Authorisation.migrateData, LearningData.migrateData]
+	mapM_ (Persistency.upgradeDB (JRState.tablesFile site)) [Authorisation.migrateData, LearningData.migrateData, DeckData.migrateData]
 	>> LearningResync.update site
 	>> Y.warp (fromMaybe (if JRState.secureOnly site then 443 else 80) (JRState.portNumber site)) site

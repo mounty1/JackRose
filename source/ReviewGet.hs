@@ -24,14 +24,14 @@ import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, getUserConfig, JRState, tablesFile)
-import qualified UserDeck (UserDeckCpt(..), NewThrottle, obverse)
-import LearningData (ViewId, LearnDatumId, LearnDatum(..), dueItems, getViewKey, getDataRowKey, getLearnDatumKey)
+import qualified UserDeck (UserDeckCpt(..), NewThrottle)
+import LearningData (ViewId, LearnDatumId, LearnDatum(..), dueItems, getDataRowKey, getLearnDatumKey)
 import Data.Time (getCurrentTime)
-import UserToId (userToId)
-import Authorisation (User)
+import Authorisation (UserId)
 import Database.Persist.Sqlite (runSqlPool)
+import TextShow (showt)
 import Data.Maybe (listToMaybe)
-import Database.Persist.Sql (Entity(Entity))
+import Database.Persist.Sql (Entity(Entity), fromSqlKey)
 
 
 type PresentationParams = (LearnDatumId, XML.Document)
@@ -50,45 +50,44 @@ getReviewR deckSteck = onlyIfAuthorised (review $ splitSlash deckSteck)
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
 review deckPath {- | e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod >>= zappo where
 		-- TODO: for no-user case, just go back to the login screen, but with the message;  then lose informationMessage
-			zappo site = (YC.liftIO $ userToId site username) >>= maybe (informationMessage "user disappeared") zimmo where
-				zimmo userId = (YC.liftIO $ JRState.getUserConfig site) >>= zemmo where
-					zemmo userConfig = maybe (informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site userId Nothing deckPath) (DM.lookup username userConfig)
+			zappo site = (YC.liftIO $ JRState.getUserConfig site) >>= zemmo where
+				zemmo userConfig = maybe (informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath) (DM.lookup username userConfig)
 
 
 splitSlash :: DT.Text -> [DT.Text]
 splitSlash = DL.filter (not . DT.null) . DT.split (== '/')
 
 
-descendToDeckRoot :: JRState.JRState -> Entity User -> UserDeck.NewThrottle -> [DT.Text] -> [UserDeck.UserDeckCpt] -> Foundation.Handler YC.Html
+descendToDeckRoot :: JRState.JRState -> UserDeck.NewThrottle -> [DT.Text] -> (UserId, [UserDeck.UserDeckCpt]) -> Foundation.Handler YC.Html
 
 -- Still nodes to descend in requested sub-tree, but nowhere to go
-descendToDeckRoot _ _ _ _ [] = informationMessage "nowhere to go"
+descendToDeckRoot _ _ _ (_, []) = informationMessage "nowhere to go"
 
 -- If XPath-like spec. is empty then 'stuff' is the requested sub-tree so pick an item to display.
 -- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
 -- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
 -- which is the daily (well, sliding 24 hour window) limit on new cards.
-descendToDeckRoot site userParams throttle [] (stuff : _) = searchForExistingByTable site userParams stuff >>= maybe (searchForNew site userParams throttle stuff >>= maybe (informationMessage "no more items") setAndReturn) setAndReturn
+descendToDeckRoot site throttle [] (userId, stuff : _) = searchForExistingByTable site userId stuff >>= maybe (searchForNew site userId throttle stuff >>= maybe (informationMessage "no more items") setAndReturn) setAndReturn
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
-descendToDeckRoot site userParams throttle deckPath@(d1 : dn) (UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
-	if d1 == label then descendToDeckRoot site userParams newThrottle dn item else descendToDeckRoot site userParams throttle deckPath rest where
+descendToDeckRoot site throttle deckPath@(d1 : dn) (userId, UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
+	if d1 == label then descendToDeckRoot site newThrottle dn (userId, item) else descendToDeckRoot site throttle deckPath (userId, rest) where
 		newThrottle = mergeThrottle throttle maybeThrottle
 
 -- no match so try next peer
-descendToDeckRoot site userParams throttle deckPath (_ : rest) = descendToDeckRoot site userParams throttle deckPath rest
+descendToDeckRoot site throttle deckPath (userId, _ : rest) = descendToDeckRoot site throttle deckPath (userId, rest)
 
 
 -- TODO document
-searchForExistingByTable :: JRState.JRState -> Entity User -> UserDeck.UserDeckCpt -> Foundation.Handler (Maybe PresentationParams)
+searchForExistingByTable :: JRState.JRState -> UserId -> UserDeck.UserDeckCpt -> Foundation.Handler (Maybe PresentationParams)
 
 -- descended to a terminal node (a TableView) so get the next card from it
-searchForExistingByTable site (Entity userId name) tableTree =YC.liftIO $ getCurrentTime >>= showCardItem where
+searchForExistingByTable site userId tableTree =YC.liftIO $ getCurrentTime >>= showCardItem where
 	showCardItem now = JRState.runFilteredLoggingT site (runSqlPool (dueItems userId now (tableList tableTree)) (JRState.tablesFile site)) >>= return . fmap getItemAndViewIds . listToMaybe
 
 
 tableList :: UserDeck.UserDeckCpt -> [ViewId]
-tableList (UserDeck.TableView _ _ vid _ _ _) = [vid]
+tableList (UserDeck.TableView _ _ vid _) = [vid]
 tableList (UserDeck.SubDeck _ _ _ dex) = concatMap tableList dex
 
 
@@ -97,12 +96,12 @@ getItemAndViewIds :: Entity LearnDatum -> PresentationParams
 getItemAndViewIds (Entity i _) = (i, XML.Document standardPrologue (embed [XML.NodeContent "obverse side"]) [])
 
 
-searchForNew ::JRState.JRState ->  Entity User -> UserDeck.NewThrottle -> UserDeck.UserDeckCpt -> Foundation.Handler (Maybe PresentationParams)
-searchForNew site userParams throttle deck = YC.liftIO $ return Nothing
+searchForNew ::JRState.JRState -> UserId -> UserDeck.NewThrottle -> UserDeck.UserDeckCpt -> Foundation.Handler (Maybe PresentationParams)
+searchForNew site userId throttle deck = YC.liftIO $ return Nothing
 
 
 setAndReturn :: PresentationParams -> Foundation.Handler YC.Html
-setAndReturn (item, document) = setSession viewIdKey (getViewKey viewId)
+setAndReturn (item, document) = setSession viewIdKey (showt $ fromSqlKey viewId)
 		>> setSession rowIdKey dataKey
 		>> YC.liftIO (BZH.toHtml `fmap` return document) where
 		(viewId, rowId, _) = getLearnDatumKey item

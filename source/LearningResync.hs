@@ -40,7 +40,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Logger (LoggingT, logWarnNS)
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar (modifyTVar')
-import ConnectionData (DataDescriptor(..), DataHandle(..))
+import ConnectionSpec (DataDescriptor(..), DataHandle(..))
 
 
 -- | Create handles or connections to all data sources;
@@ -112,6 +112,7 @@ reSyncOneSource (Postgres sourceConn sourceDBtable) site _ timeStamp primaryKey 
 		primyKeysForQ = DT.unpack $ DT.concat $ intersperse packedComma $ map enQuote primaryKey
 
 
+-- TODO merge this with DataSource.hs;  there's an unnecessary layer here.
 connection :: JRState.JRState -> DS.DataVariant -> IO OpenDataSource
 
 connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybeUser maybePassword) = catch (neoConn >>= pullStructure) sourceFail where
@@ -130,7 +131,7 @@ connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybe
 	tableNameStr = DT.unpack dataTable
 	makeLabel label value = label ++ "=\"" ++ show value ++ "\""
 
-connection _ (DS.Sqlite3 dtableName) = return $ OpenDataSource (ConnectionData.Sqlite3 dtableName) [] []
+connection _ (DS.Sqlite3 dtableName) = return $ OpenDataSource (ConnectionSpec.Sqlite3 dtableName) [] []
 
 
 attName :: String

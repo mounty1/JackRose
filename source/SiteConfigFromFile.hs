@@ -20,7 +20,7 @@ import qualified CommandArgs (CmdLineArgs(..))
 import qualified Data.ConfigFile as DC
 import qualified Data.Maybe as DMy
 import qualified AuthoriStyle (Style(..))
-import qualified JRState (JRState(..), DataSchemes, UserConfig)
+import qualified JRState (JRState(..), DataSchemes, DataViews, UserConfig)
 import qualified Data.Map as DM (empty)
 import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool, ConnectionPool)
 import Control.Concurrent.STM (newTVar, TVar)
@@ -33,22 +33,22 @@ import LogFilter (runFilteredLoggingT)
 -- | Called once when the application starts;  it takes the command line parameters object and
 -- constructs the Yesod foundation object, logging any warnings, errors and information.
 siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
-siteObject argsMap = atomically (newTVar DM.empty) >>= \t -> atomically (newTVar DM.empty) >>= configurationData t where
+siteObject argsMap = atomically (newTVar DM.empty) >>= \t -> atomically (newTVar DM.empty) >>=  \s -> atomically (newTVar DM.empty) >>= configurationData s t where
 
 	-- feed the user data STM object into the reading of the configuration file.
-	configurationData :: TVar JRState.DataSchemes -> TVar JRState.UserConfig -> IO JRState.JRState
-	configurationData dataSchemes sharedData =
+	configurationData :: TVar JRState.DataViews -> TVar JRState.DataSchemes -> TVar JRState.UserConfig -> IO JRState.JRState
+	configurationData dataSchemes views sharedData =
 		-- if the configuration file name be specified, it must be readable, but the default file need not exist.
 		(if conFallback then flip catchError warnBadConfigFile else id) (DC.readfile initConfig configName) >>=
-			either (return . error . errorInConfig) (assembleConf dataSchemes sharedData)
+			either (return . error . errorInConfig) (assembleConf dataSchemes views sharedData)
 
 	-- we can't use the configured logging level because the configuration file can't be read.
 	warnBadConfigFile :: Show s => s -> IO (Either a DC.ConfigParser)
 	warnBadConfigFile err = runFilteredLoggingT fallbackDebugLevel (logWarnNS configLogName (DT.pack $ show err)) >> (return $ Right initConfig)
 
 	-- feed the user data STM, the configuration file contents and now the database connection pool, into the creation of the site object.
-	assembleConf :: TVar JRState.DataSchemes -> TVar JRState.UserConfig -> DC.ConfigParser -> IO JRState.JRState
-	assembleConf dataSchemes sharedData configuration = runFilteredLoggingT verbosity connPoolM >>= makeAppObject where
+	assembleConf :: TVar JRState.DataViews -> TVar JRState.DataSchemes -> TVar JRState.UserConfig -> DC.ConfigParser -> IO JRState.JRState
+	assembleConf dataSchemes views sharedData configuration = runFilteredLoggingT verbosity connPoolM >>= makeAppObject where
 
 		-- accumulate up the fields of the site object, one by one.
 		-- the list of configuration key values is of course static, but subject to maintenance.
@@ -67,12 +67,12 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \t -> atomically (newTVar
 											extractConfItem id False "shuffle" $
 												extractConfItem id True "secureSession" $ (connLabels, JRState.JRState verbosity pool)
 		-- create the site object and return it, logging information, warnings and errors as required.
-		spliceShared :: Show l => ([DT.Text], TVar JRState.DataSchemes -> TVar JRState.UserConfig -> JRState.JRState) -> Either l [String] -> IO JRState.JRState
+		spliceShared :: Show l => ([DT.Text], TVar JRState.DataViews -> TVar JRState.DataSchemes -> TVar JRState.UserConfig -> JRState.JRState) -> Either l [String] -> IO JRState.JRState
 		spliceShared (labels, fn) keysE = runFilteredLoggingT verbosity (either munchErr munchKeys keysE) >> return site where
 			munchErr = logErrorNS configLogName . DT.pack . show
 			munchKeys keys = mapM_ (logDebugNS configLogName . makeUnseenKeyMsg) (labels \\ keysInConfig) >> mapM_ (logWarnNS configLogName . makeUnknownKeyMsg) (keysInConfig \\ labels) where
 				keysInConfig = map DT.pack keys
-			site = fn dataSchemes sharedData
+			site = fn dataSchemes views sharedData
 
 		-- poor man's Writer function;  extract a value from the configuration data and accumulate its key.
 		extractConfItem :: DC.Get_C s => (s -> b) -> b -> DT.Text -> ([DT.Text], b -> a) -> ([DT.Text], a)

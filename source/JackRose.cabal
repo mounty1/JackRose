@@ -44,8 +44,10 @@ executable JackRose
                       AuthoriStyle
                       Authorisation
                       CommandArgs
-                      ConfigParse
-                      ConnectionData
+                      ConnectionSpec
+                      ViewSpec
+                      DeckData
+                      DeckSpec
                       DataSource
                       EmailVerification
                       FailureMessage

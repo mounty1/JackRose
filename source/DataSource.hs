@@ -1,5 +1,5 @@
 {-|
-Description: Management of user-defined data sources.
+Description: Management of user-defined data sources;  to be repealed.
 Copyright: (c) Michael Mounteney, 2015
 License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
@@ -13,7 +13,7 @@ Data sources are the content of question/answer pairs.  They can be SQL tables, 
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module DataSource (DataSource(..), DataVariant(..), enSerialise, deSerialise) where
+module DataSource (DataSource(..), DataVariant(..), deSerialise) where
 
 
 import TextShow (showt)
@@ -40,6 +40,7 @@ showMT :: Maybe DT.Text -> DT.Text
 showMT = maybe DT.empty id
 
 
+-- TODO we don't need this;  replace with something that validates JSON input or similar.
 enSerialise :: DataVariant -> DT.Text
 enSerialise (Postgres serverIP portNo dbase nameSpace dtable userName passWord) = DL.enSerialise [ "P", serverIP, showMI portNo, showMT dbase, showMT nameSpace, dtable, showMT userName, showMT passWord ]
 enSerialise (Sqlite3 dtableName) = DL.enSerialise [ "Q", dtableName ]

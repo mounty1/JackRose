@@ -12,9 +12,8 @@ module UserDeck where
 
 
 import Data.Text (Text)
-import Text.XML (Node)
 import LearningData (ViewId)
-import ConnectionData (DataDescriptor)
+import ConnectionSpec (DataDescriptor)
 
 
 type NewThrottle = Maybe Int
@@ -31,7 +30,5 @@ data UserDeckCpt =
 		throttle :: NewThrottle,
 		shuffle :: Bool,
 		vid :: ViewId,
-		handle :: DataDescriptor,
-		obverse :: [Node],
-		backside :: [Node]
+		handle :: DataDescriptor
 	}
