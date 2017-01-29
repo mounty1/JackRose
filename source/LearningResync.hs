@@ -26,7 +26,7 @@ import qualified Database.Persist.Class (Key)
 import Database.Persist.Sql (Entity)
 import Database.Persist.Sqlite (ConnectionPool, runSqlPool, selectList)
 import Database.Persist (replace)
-import Database.Persist.Sql (insertBy)
+import Database.Persist.Sql (insertUnique)
 import Database.Persist.Types (entityKey, entityVal)
 import DataSource (deSerialise)
 import TextList (enSerialise)
@@ -34,7 +34,8 @@ import Data.Maybe (fromMaybe)
 import qualified JRState (JRState(..), runFilteredLoggingT)
 import qualified LearningData (DataSource(..), DataRow(..), DataSourceId)
 import qualified DataSource as DS (DataVariant(..))
-import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable, prepare, sFetchAllRows)
+import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable, prepare, sExecute, sFetchAllRows)
+import Database.HDBC.Statement (Statement)
 import Database.HDBC.PostgreSQL (connectPostgreSQL)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Logger (LoggingT, logWarnNS)
@@ -74,9 +75,10 @@ updateOneSource site schemeMap sourceRecord = maybe badConnString mkConnection (
 	reSyncRows (OpenDataSource openConn colheads priKeys) = liftIO getCurrentTime >>= updateSync
 				>> schemeMap >>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn) where
 		updateSync timeStamp = liftIO (reSyncOneSource openConn site colheads timeStamp priKeys dataSourceKey learningPersistPool) >>= updateSource timeStamp
-		--update time-stamp only replace if new data_rows were inserted.
-		updateSource timeStamp True = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool
-		updateSource _ False = return ()
+		-- Update time-stamp only replace if new data_rows were inserted.
+		-- It looks like we could use just a Boolean, but the foldl' below stops when True be returned
+		updateSource _ 0 = return ()
+		updateSource timeStamp _ = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool
 
 	learningPersistPool = JRState.tablesFile site
 	dataSourceKey = entityKey sourceRecord
@@ -88,27 +90,27 @@ updateOneSource site schemeMap sourceRecord = maybe badConnString mkConnection (
 data OpenDataSource = OpenDataSource DataHandle [DT.Text] [DT.Text] | Unavailable DT.Text
 
 
-reSyncOneSource :: DataHandle -> JRState.JRState -> [DT.Text] -> UTCTime -> [DT.Text] -> Database.Persist.Class.Key LearningData.DataSource -> ConnectionPool -> IO Bool
+reSyncOneSource :: DataHandle -> JRState.JRState -> [DT.Text] -> UTCTime -> [DT.Text] -> Database.Persist.Class.Key LearningData.DataSource -> ConnectionPool -> IO Int
 
 reSyncOneSource (Postgres sourceConn sourceDBtable) site _ timeStamp primaryKey sourceKey learningPersistPool =
-	HDBC.prepare sourceConn primyKeyQuery >>= HDBC.sFetchAllRows >>= foldl' row1yKeyUpdate (return False) where
+	HDBC.prepare sourceConn primyKeyQuery >>= exeStmt >>= foldl' row1yKeyUpdate (return 0) where
 		-- extract primary key value from row as [Maybe String] and convert to Maybe [SerialisedKey]
-		row1yKeyUpdate :: IO Bool -> [Maybe String] -> IO Bool
-		row1yKeyUpdate mChanged dataRow = tryInsert mChanged ((enSerialise . map DT.pack) `fmap` sequence dataRow)
+		row1yKeyUpdate :: IO Int -> [Maybe String] -> IO Int
+		row1yKeyUpdate mAddCount dataRow = tryInsert mAddCount ((enSerialise . map DT.pack) `fmap` sequence dataRow)
 		-- Insert one key value into learning data, if it not already exist therein.
 		-- We don't log anything because the Persist calls do it all.
 		-- We accume a Boolean which is 'was anything changed?'
 		-- TODO try mapM insertBy [rows]
 		-- TODO do something useful if the key be Nothing
-		tryInsert :: IO Bool -> Maybe DT.Text -> IO Bool
-		tryInsert mChanged = maybe mChanged (tryInsertKey mChanged)
-		tryInsertKey :: IO Bool -> DT.Text -> IO Bool
-		-- TODO could we return the error code rather than just throwing it away with const mChanged?
-		tryInsertKey mChanged keyValue = JRState.runFilteredLoggingT site (runSqlPool (insertBy (LearningData.DataRow keyValue sourceKey timeStamp)) learningPersistPool)
-				>>= either (const mChanged) (return . const True)
+		tryInsert :: IO Int -> Maybe DT.Text -> IO Int
+		tryInsert mAddCount = maybe mAddCount (tryInsertKey mAddCount)
+		tryInsertKey :: IO Int -> DT.Text -> IO Int
+		-- TODO could we return the error code rather than just throwing it away with const mAddCount?
+		tryInsertKey mAddCount keyValue = JRState.runFilteredLoggingT site (runSqlPool (insertUnique $ LearningData.DataRow keyValue sourceKey timeStamp) learningPersistPool)
+			>>= maybe mAddCount (\_ -> ((+) 1) `fmap` mAddCount)
 		-- SQL to select primary key data rows
 		primyKeyQuery = "SELECT " ++ primyKeysForQ ++ " FROM \"" ++ DT.unpack sourceDBtable ++ "\";"
-		-- comma-separated list of primary key fields
+		-- comma-separated list of primary key fieldsKey
 		primyKeysForQ = DT.unpack $ DT.concat $ intersperse packedComma $ map enQuote primaryKey
 
 
@@ -123,8 +125,10 @@ connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybe
 			" user=" ++ (DT.unpack $ fromMaybe (JRState.databaseUser site) maybeUser) ++
 			maybe "" (\pw -> makeLabel " password" (DT.unpack pw)) maybePassword
 	pullStructure conn = HDBC.describeTable conn tableNameStr >>= mashIntoFields conn
-	mashIntoFields conn rows = HDBC.prepare conn primyKeyQuery >>= HDBC.sFetchAllRows >>=return . maybe [] (map DT.pack) . sequence . map head >>= return . zing where
-		zing primKeys = OpenDataSource (Postgres conn dataTable) (map putColHead rows) primKeys
+	mashIntoFields conn rows = HDBC.prepare conn primyKeyQuery >>=
+			exeStmt >>=
+			return . maybe [] (map DT.pack) . sequence . map head >>=
+			return . OpenDataSource (Postgres conn dataTable) (map putColHead rows)
 	sourceFail :: HDBC.SqlError -> IO OpenDataSource
 	sourceFail = return . Unavailable . DT.pack . show
 	primyKeyQuery = "SELECT \"" ++ attName ++ "\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass ORDER BY a.attnum;"
@@ -132,6 +136,11 @@ connection site (DS.Postgres serverIP maybePort dbase maybeTable dataTable maybe
 	makeLabel label value = label ++ "=\"" ++ show value ++ "\""
 
 connection _ (DS.Sqlite3 dtableName) = return $ OpenDataSource (ConnectionSpec.Sqlite3 dtableName) [] []
+
+
+-- TODO actually look at the Integer returned and throw an error if necessary
+exeStmt :: Statement -> IO [[Maybe String]]
+exeStmt stmt = HDBC.sExecute stmt [] >> HDBC.sFetchAllRows stmt
 
 
 attName :: String

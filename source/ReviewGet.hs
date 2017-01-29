@@ -25,13 +25,15 @@ import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, getUserConfig, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
-import LearningData (ViewId, LearnDatumId, LearnDatum(..), dueItems, getDataRowKey, getLearnDatumKey)
+import LearningData (ViewId, LearnDatumId, LearnDatum(..), newItem, dueItem, getDataRowKey, getLearnDatumKey)
 import Data.Time (getCurrentTime)
 import Authorisation (UserId)
 import Database.Persist.Sqlite (runSqlPool)
 import TextShow (showt)
 import Data.Maybe (listToMaybe)
 import Database.Persist.Sql (Entity(Entity), fromSqlKey)
+import Database.Persist.Sql (SqlPersistT)
+import Control.Monad.Logger (LoggingT)
 
 
 type PresentationParams = (LearnDatumId, XML.Document)
@@ -50,8 +52,8 @@ getReviewR deckSteck = onlyIfAuthorised (review $ splitSlash deckSteck)
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
 review deckPath {- | e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod >>= zappo where
 		-- TODO: for no-user case, just go back to the login screen, but with the message;  then lose informationMessage
-			zappo site = (YC.liftIO $ JRState.getUserConfig site) >>= zemmo where
-				zemmo userConfig = maybe (informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath) (DM.lookup username userConfig)
+			zappo site = (YC.liftIO $ JRState.getUserConfig site) >>=
+				maybe (informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath) . DM.lookup username
 
 
 splitSlash :: DT.Text -> [DT.Text]
@@ -67,7 +69,9 @@ descendToDeckRoot _ _ _ (_, []) = informationMessage "nowhere to go"
 -- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
 -- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
 -- which is the daily (well, sliding 24 hour window) limit on new cards.
-descendToDeckRoot site throttle [] (userId, stuff : _) = searchForExistingByTable site userId stuff >>= maybe (searchForNew site userId throttle stuff >>= maybe (informationMessage "no more items") setAndReturn) setAndReturn
+descendToDeckRoot site throttle [] (userId, stuff : _) = searchForExistingByTable site userId flattenedDeck >>= maybe fallToNew setAndReturn where
+		fallToNew = searchForNew site userId throttle flattenedDeck >>= maybe (informationMessage "no more items") setAndReturn
+		flattenedDeck = tableList stuff
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
 descendToDeckRoot site throttle deckPath@(d1 : dn) (userId, UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
@@ -79,11 +83,11 @@ descendToDeckRoot site throttle deckPath (userId, _ : rest) = descendToDeckRoot 
 
 
 -- TODO document
-searchForExistingByTable :: JRState.JRState -> UserId -> UserDeck.UserDeckCpt -> Foundation.Handler (Maybe PresentationParams)
+searchForExistingByTable :: JRState.JRState -> UserId -> [ViewId] -> Foundation.Handler (Maybe PresentationParams)
 
 -- descended to a terminal node (a TableView) so get the next card from it
-searchForExistingByTable site userId tableTree =YC.liftIO $ getCurrentTime >>= showCardItem where
-	showCardItem now = JRState.runFilteredLoggingT site (runSqlPool (dueItems userId now (tableList tableTree)) (JRState.tablesFile site)) >>= return . fmap getItemAndViewIds . listToMaybe
+searchForExistingByTable site userId views =YC.liftIO $ getCurrentTime >>= showCardItem where
+	showCardItem now = runItemQuery site (dueItem userId now views)
 
 
 tableList :: UserDeck.UserDeckCpt -> [ViewId]
@@ -91,13 +95,16 @@ tableList (UserDeck.TableView _ _ vid _) = [vid]
 tableList (UserDeck.SubDeck _ _ _ dex) = concatMap tableList dex
 
 
-
 getItemAndViewIds :: Entity LearnDatum -> PresentationParams
 getItemAndViewIds (Entity i _) = (i, XML.Document standardPrologue (embed [XML.NodeContent "obverse side"]) [])
 
 
-searchForNew ::JRState.JRState -> UserId -> UserDeck.NewThrottle -> UserDeck.UserDeckCpt -> Foundation.Handler (Maybe PresentationParams)
-searchForNew site userId throttle deck = YC.liftIO $ return Nothing
+searchForNew ::JRState.JRState -> UserId -> UserDeck.NewThrottle -> [ViewId] -> Foundation.Handler (Maybe PresentationParams)
+searchForNew site userId throttle views = runItemQuery site (newItem userId views)
+
+
+runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> SqlPersistT (LoggingT m) [Entity LearnDatum] -> m (Maybe PresentationParams)
+runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn (JRState.tablesFile site)) >>= return . fmap getItemAndViewIds . listToMaybe
 
 
 setAndReturn :: PresentationParams -> Foundation.Handler YC.Html

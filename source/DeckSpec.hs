@@ -68,12 +68,8 @@ instance Y.MonadBase IO ParsingResult where
 
 
 instance Y.MonadBaseControl IO ParsingResult where
-	-- liftBaseWith :: (Control.Monad.Trans.Control.RunInBase ParsingResult IO -> IO a) -> ParsingResult a
 	type StM ParsingResult a = Either DT.Text a
 	liftBaseWith f = ParsingResult $ liftBaseWith $ \q -> Right `fmap` f (q . unwrapPR)
-{-	liftBaseWith f =ParsingResult $ LoggingT $ \reader' ->
-		fmap Right $ liftBaseWith $ \runInBase ->
-		f $ runInBase . (\(LoggingT r) -> r reader') -}
 	restoreM = ParsingResult . restoreM
 
 type SchemaParsing = ParsingResult [UserDeck.UserDeckCpt]

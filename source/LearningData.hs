@@ -26,7 +26,8 @@ module LearningData (migrateData,
 		DataRowId,
 		LearnDatumId,
 		LearnDatum(..),
-		dueItems,
+		dueItem,
+		newItem,
 		History(..),
 		getView,
 		mkDataRowKey,
@@ -57,6 +58,7 @@ DataRow
 	dataSourceRowId DataSourceId NOT NULL
 	loaded UTCTime NOT NULL
 	Primary tableKey dataSourceRowId
+	UniqueRow tableKey dataSourceRowId
 View
 	name DT.Text NOT NULL
 	dataSourceId DataSourceId NOT NULL
@@ -66,6 +68,7 @@ LearnDatum
 	viewUID ViewId NOT NULL
 	itemId DataRowId NOT NULL
 	user UserId NOT NULL
+	activity Int8 NOT NULL
 	nextReview UTCTime NOT NULL
 	Primary viewUID itemId user
 History
@@ -75,9 +78,23 @@ History
 	Primary item stamp
 |]
 
+{- Activity:
+	0 new item
+	1 suspended
+	2 active
+	3 suppressed by selection criteria
+-}
 
-dueItems :: forall (m :: * -> *). Y.MonadIO m => UserId -> UTCTime -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
-dueItems user stamp views = selectList [ LearnDatumNextReview <. stamp, LearnDatumUser ==. user, LearnDatumViewUID <-. views ] [ LimitTo 1 ]
+nextItem :: forall (m :: * -> *). Y.MonadIO m => Int8 -> [Y.Filter LearnDatum] -> UserId -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
+nextItem activityState extras user views = selectList ((LearnDatumActivity ==. activityState) : (LearnDatumUser ==. user) : (LearnDatumViewUID <-. views) : extras) [ LimitTo 1 ]
+
+
+newItem :: forall (m :: * -> *). Y.MonadIO m => UserId -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
+newItem user views = nextItem 0 [] user views
+
+
+dueItem :: forall (m :: * -> *). Y.MonadIO m => UserId -> UTCTime -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
+dueItem user stamp views = nextItem 2 [ LearnDatumNextReview <. stamp ] user views
 
 
 getDataRow :: forall (m :: * -> *). Y.MonadIO m => DataRowId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend DataRow) m (Maybe DataRow)
