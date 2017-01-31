@@ -30,8 +30,6 @@ module LearningData (migrateData,
 		newItem,
 		History(..),
 		getView,
-		mkDataRowKey,
-		getDataRowKey,
 		mkLearnDatumKey,
 		getLearnDatumKey) where
 
@@ -57,7 +55,6 @@ DataRow
 	tableKey DT.Text NOT NULL
 	dataSourceRowId DataSourceId NOT NULL
 	loaded UTCTime NOT NULL
-	Primary tableKey dataSourceRowId
 	UniqueRow tableKey dataSourceRowId
 View
 	name DT.Text NOT NULL
@@ -103,14 +100,6 @@ getDataRow = Y.get
 
 getView :: forall (m :: * -> *). Y.MonadIO m => ViewId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend View) m (Maybe View)
 getView = Y.get
-
-
-mkDataRowKey :: DT.Text -> DataSourceId -> Y.Key DataRow
-mkDataRowKey = DataRowKey
-
-
-getDataRowKey :: Y.Key DataRow -> (DT.Text, DataSourceId)
-getDataRowKey (DataRowKey k d) = (k, d)
 
 
 mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Key LearnDatum

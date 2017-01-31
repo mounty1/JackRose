@@ -25,7 +25,7 @@ import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, getUserConfig, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
-import LearningData (ViewId, LearnDatumId, LearnDatum(..), newItem, dueItem, getDataRowKey, getLearnDatumKey)
+import LearningData (ViewId, LearnDatumId, LearnDatum(..), newItem, dueItem, getLearnDatumKey)
 import Data.Time (getCurrentTime)
 import Authorisation (UserId)
 import Database.Persist.Sqlite (runSqlPool)
@@ -69,8 +69,8 @@ descendToDeckRoot _ _ _ (_, []) = informationMessage "nowhere to go"
 -- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
 -- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
 -- which is the daily (well, sliding 24 hour window) limit on new cards.
-descendToDeckRoot site throttle [] (userId, stuff : _) = searchForExistingByTable site userId flattenedDeck >>= maybe fallToNew setAndReturn where
-		fallToNew = searchForNew site userId throttle flattenedDeck >>= maybe (informationMessage "no more items") setAndReturn
+descendToDeckRoot site throttle [] (userId, stuff : _) = searchForExistingByTable site userId flattenedDeck >>= maybe fallToNew rememberItem where
+		fallToNew = searchForNew site userId throttle flattenedDeck >>= maybe (informationMessage "no more items") rememberItem
 		flattenedDeck = tableList stuff
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
@@ -107,12 +107,12 @@ runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> S
 runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn (JRState.tablesFile site)) >>= return . fmap getItemAndViewIds . listToMaybe
 
 
-setAndReturn :: PresentationParams -> Foundation.Handler YC.Html
-setAndReturn (item, document) = setSession viewIdKey (showt $ fromSqlKey viewId)
-		>> setSession rowIdKey dataKey
+-- put the necessary data into the session so that the POST knows what to add or update.
+rememberItem :: PresentationParams -> Foundation.Handler YC.Html
+rememberItem (item, document) = setSession "JR.view" (showt $ fromSqlKey viewId)
+		>> setSession "JR.row" (showt $ fromSqlKey rowId)
 		>> YC.liftIO (BZH.toHtml `fmap` return document) where
 		(viewId, rowId, _) = getLearnDatumKey item
-		(dataKey, _) = getDataRowKey rowId
 
 
 mergeThrottle :: UserDeck.NewThrottle -> UserDeck.NewThrottle -> UserDeck.NewThrottle
@@ -174,11 +174,6 @@ embed content =
 			]
 		]
 	]
-
-
-viewIdKey, rowIdKey :: DT.Text
-viewIdKey = "JR.view"
-rowIdKey = "JR.row"
 
 
 oneSpace :: XML.Node

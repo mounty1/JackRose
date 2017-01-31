@@ -130,13 +130,13 @@ connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername
 	makeLabel label value = label ++ "=\"" ++ show value ++ "\""
 
 
-connection _site [ "Q", _dtableName ] = return $ Left $ DT.pack $ "SQLite not implemented yet"
+connection _site [ "Q", _dtableName ] = return $ Left "SQLite not implemented yet"
 
-connection _site [ "C", _recseparator, _ffileCSV ] = return $ Left $ DT.pack $ "CSV not implemented yet"
+connection _site [ "C", _recseparator, _ffileCSV ] = return $ Left "CSV not implemented yet"
 
-connection _site [ "X", _ffileXML ] = return $ Left $ DT.pack $ "XML not implemented yet"
+connection _site [ "X", _ffileXML ] = return $ Left "XML not implemented yet"
 
-connection _ connStr = return $ Left $ DT.concat ("invalid connection string" : connStr)
+connection _ connStr = return $ Left $ DT.concat ("invalid connection string: " : connStr)
 
 
 -- TODO actually look at the Integer returned and throw an error if necessary
@@ -157,5 +157,5 @@ enQuote word = DT.concat [packedQuote, word, packedQuote]
 
 
 packedComma, packedQuote :: DT.Text
-packedComma = DT.pack ","
-packedQuote = DT.pack "\""
+packedComma = ","
+packedQuote = "\""
