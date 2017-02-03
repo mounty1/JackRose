@@ -23,7 +23,7 @@ import Control.Exception (catch)
 import Data.List (foldl', intersperse)
 import qualified Data.Map as DM (insert)
 import qualified Data.Text as DT (Text, concat, pack, unpack, null)
-import Database.Persist.Sql (Entity)
+import Database.Persist.Sql (Entity, Key)
 import Database.Persist.Sqlite (runSqlPool, selectList)
 import Database.Persist (replace)
 import Database.Persist.Sql (insertBy)
@@ -31,7 +31,7 @@ import Database.Persist.Types (entityKey, entityVal)
 import TextList (enSerialise)
 import Data.Maybe (catMaybes)
 import qualified JRState (JRState(..), runFilteredLoggingT)
-import qualified LearningData (DataSource(..), DataRow(..), DataSourceId)
+import qualified LearningData (DataSource(..), DataRow(..), DataSourceId, LearnDatum, mkLearnDatum, ViewId)
 import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable, prepare, sExecute, sFetchAllRows)
 import Database.HDBC.Statement (Statement)
 import Database.HDBC.PostgreSQL (connectPostgreSQL)
@@ -42,6 +42,12 @@ import Control.Concurrent.STM.TVar (modifyTVar')
 import ConnectionSpec (DataDescriptor(..), DataHandle(..))
 import MaybeIntValue (maybeIntValue)
 import TextList (deSerialise)
+import qualified Data.Either as DE (partitionEithers)
+import DeckData (userDeckEnds, userDeckEndViewId)
+import Authorisation (UserId, userList)
+import qualified Control.Monad.Trans.Reader (ReaderT)
+import qualified Database.Persist.Sql (SqlBackend)
+import Debug (display)
 
 
 -- | Create handles or connections to all data sources;
@@ -70,12 +76,17 @@ updateOneSource site schemeMap sourceRecord = liftIO (connection site (deSeriali
 	reSyncRows :: OpenDataSource -> LoggingT IO DataSchemes
 	reSyncRows (OpenDataSource openConn colheads _ dataKeysList) = liftIO getCurrentTime >>= updateSync
 				>> schemeMap >>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn) where
-		updateSync timeStamp = runSqlPool (sequence $ map insertRow dataKeysList) learningPersistPool >>= updateSource timeStamp where
+		updateSync timeStamp = runSqlPool (sequence $ map insertRow dataKeysList) learningPersistPool >>= updateSource . DE.partitionEithers where
 			insertRow keyValue = insertBy $ LearningData.DataRow keyValue dataSourceKey timeStamp
-		-- Update time-stamp only replace if new data_rows were inserted.
-		-- It looks like we could use just a Boolean, but the foldl' below stops when True be returned
-		updateSource _ [] = return ()
-		updateSource timeStamp (_ : _) = runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool
+			-- Update time-stamp only replace if new data_rows were inserted.
+			updateSource :: ([Entity LearningData.DataRow], [Key LearningData.DataRow]) -> LoggingT IO ()
+			updateSource (_, []) = return ()
+			updateSource (olds, newItems) = runSqlPool (userList >>= fmap concat . sequence . map viewByUser >>= fmap concat . sequence . map insertLearnDatum) learningPersistPool >>
+					runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool where
+				viewByUser :: UserId -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend (LoggingT IO) [(UserId, LearningData.ViewId)]
+				viewByUser user = (map (\view -> (user, userDeckEndViewId $ entityVal view))) `fmap` userDeckEnds user
+				insertLearnDatum :: (UserId, LearningData.ViewId) -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend (LoggingT IO) [Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum)]
+				insertLearnDatum (user, view) = sequence $ map (\itemId -> insertBy $ LearningData.mkLearnDatum view itemId user 0 timeStamp) newItems
 
 	learningPersistPool = JRState.tablesFile site
 	dataSourceKey = entityKey sourceRecord

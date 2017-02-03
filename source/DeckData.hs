@@ -1,16 +1,10 @@
 {-|
-Description: Management of persistent storage;  items learning, review and scoring data.
-Copyright: (c) Michael Mounteney, 2015
+Description: Management of persistent storage;  hierarchical deck view per user.
+Copyright: (c) Michael Mounteney, 2017
 License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
 Stability: experimental
 Portability: undefined
-
-DataSource: reference to some database table or flat file.
-DataRow:  in Anki parlance, a note;  one table row.
-View: 'card':  display information * data row
-LearnDatum:  card * datarow * user.
-History:  record of item scores.
 -}
 
 

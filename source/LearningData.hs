@@ -30,6 +30,7 @@ module LearningData (migrateData,
 		newItem,
 		History(..),
 		getView,
+		mkLearnDatum,
 		mkLearnDatumKey,
 		getLearnDatumKey) where
 
@@ -104,6 +105,10 @@ getView = Y.get
 
 mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Key LearnDatum
 mkLearnDatumKey = LearnDatumKey
+
+
+mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> UTCTime -> LearnDatum
+mkLearnDatum = LearnDatum
 
 
 getLearnDatumKey :: Y.Key LearnDatum -> (ViewId, DataRowId, UserId)

@@ -11,13 +11,17 @@ Portability: undefined
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, MultiParamTypeClasses, GADTs, GeneralizedNewtypeDeriving, RankNTypes #-}
 
 
-module Authorisation (migrateData, User, UserId, mkUser) where
+module Authorisation (migrateData, User(..), UserId, mkUser, userList) where
 
 
 import qualified Yesod as Y
 import qualified Yesod.Auth.Account as YAA
 import qualified Data.ByteString as DB
 import qualified Data.Text as DT (Text, empty)
+import Database.Persist (selectList, (==.))
+import qualified Control.Monad.Trans.Reader (ReaderT)
+import Database.Persist.Types (entityKey)
+
 
 Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
 User
@@ -36,6 +40,13 @@ Member
 
 mkUser :: DT.Text -> Y.Unique User
 mkUser = UniqueUsername
+
+
+-- | list of real, verified users.
+-- Unverified users are either real users who haven't yet verified their accounts, or, if they have no email,
+-- fake 'group' user accounts.
+userList :: forall (m :: * -> *). Y.MonadIO m => Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend User) m [UserId]
+userList = map entityKey `fmap` selectList [ UserVerified ==. True ] []
 
 
 instance YAA.PersistUserCredentials User where
