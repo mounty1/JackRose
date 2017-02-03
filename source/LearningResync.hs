@@ -23,11 +23,10 @@ import Control.Exception (catch)
 import Data.List (foldl', intersperse)
 import qualified Data.Map as DM (insert)
 import qualified Data.Text as DT (Text, concat, pack, unpack, null)
-import Database.Persist.Sql (Entity, Key)
+import Database.Persist.Sql (Entity(Entity), Key)
 import Database.Persist.Sqlite (runSqlPool, selectList)
 import Database.Persist (replace)
 import Database.Persist.Sql (insertBy)
-import Database.Persist.Types (entityKey, entityVal)
 import TextList (enSerialise)
 import Data.Maybe (catMaybes)
 import qualified JRState (JRState(..), runFilteredLoggingT)
@@ -47,7 +46,6 @@ import DeckData (userDeckEnds, userDeckEndViewId)
 import Authorisation (UserId, userList)
 import qualified Control.Monad.Trans.Reader (ReaderT)
 import qualified Database.Persist.Sql (SqlBackend)
-import Debug (display)
 
 
 -- | Create handles or connections to all data sources;
@@ -64,33 +62,34 @@ update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (
 			>>= liftIO . atomically . modifyTVar' (JRState.dataSchemes site) . (flip $ foldr $ uncurry DM.insert)
 
 
-type DataSchemes = [(LearningData.DataSourceId, DataDescriptor)]
+type DataSchemes = LoggingT IO [(LearningData.DataSourceId, DataDescriptor)]
 
 
-updateOneSource :: JRState.JRState -> LoggingT IO DataSchemes -> Entity LearningData.DataSource -> LoggingT IO DataSchemes
+type RowResult a = Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend (LoggingT IO) [a]
+
+
+updateOneSource :: JRState.JRState -> DataSchemes -> Entity LearningData.DataSource -> DataSchemes
 
 updateOneSource site schemeMap sourceRecord = liftIO (connection site (deSerialise dataSourceString)) >>= either badConnString reSyncRows where
 
 	badConnString word = logWarnNS dataNameString (DT.concat [dataSourceString, ": error: ", word]) >> schemeMap
 
-	reSyncRows :: OpenDataSource -> LoggingT IO DataSchemes
+	reSyncRows :: OpenDataSource -> DataSchemes
 	reSyncRows (OpenDataSource openConn colheads _ dataKeysList) = liftIO getCurrentTime >>= updateSync
 				>> schemeMap >>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn) where
-		updateSync timeStamp = runSqlPool (sequence $ map insertRow dataKeysList) learningPersistPool >>= updateSource . DE.partitionEithers where
+		updateSync timeStamp = runSqlPool ((sequence $ map insertRow dataKeysList) >>= updateSource . DE.partitionEithers) (JRState.tablesFile site) where
 			insertRow keyValue = insertBy $ LearningData.DataRow keyValue dataSourceKey timeStamp
 			-- Update time-stamp only replace if new data_rows were inserted.
-			updateSource :: ([Entity LearningData.DataRow], [Key LearningData.DataRow]) -> LoggingT IO ()
-			updateSource (_, []) = return ()
-			updateSource (olds, newItems) = runSqlPool (userList >>= fmap concat . sequence . map viewByUser >>= fmap concat . sequence . map insertLearnDatum) learningPersistPool >>
-					runSqlPool (replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}) learningPersistPool where
-				viewByUser :: UserId -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend (LoggingT IO) [(UserId, LearningData.ViewId)]
-				viewByUser user = (map (\view -> (user, userDeckEndViewId $ entityVal view))) `fmap` userDeckEnds user
-				insertLearnDatum :: (UserId, LearningData.ViewId) -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend (LoggingT IO) [Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum)]
+			updateSource :: ([Entity LearningData.DataRow], [Key LearningData.DataRow]) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
+			updateSource (_, []) = return []
+			updateSource (olds, newItems) = replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp} >>
+					userList >>= fmap concat . sequence . map viewByUser >>= fmap concat . sequence . map insertLearnDatum where
+				viewByUser :: UserId -> RowResult (UserId, LearningData.ViewId)
+				viewByUser user = (map (\(Entity _ view) -> (user, userDeckEndViewId view))) `fmap` userDeckEnds user
+				insertLearnDatum :: (UserId, LearningData.ViewId) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
 				insertLearnDatum (user, view) = sequence $ map (\itemId -> insertBy $ LearningData.mkLearnDatum view itemId user 0 timeStamp) newItems
 
-	learningPersistPool = JRState.tablesFile site
-	dataSourceKey = entityKey sourceRecord
-	dataSourceParts = entityVal sourceRecord
+	(Entity dataSourceKey dataSourceParts) = sourceRecord
 	dataSourceString = LearningData.dataSourceSourceSerial dataSourceParts
 	dataNameString = LearningData.dataSourceName dataSourceParts
 

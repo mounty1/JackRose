@@ -68,7 +68,7 @@ LearnDatum
 	user UserId NOT NULL
 	activity Int8 NOT NULL
 	nextReview UTCTime NOT NULL
-	Primary viewUID itemId user
+	LearnItem viewUID itemId user
 History
 	item LearnDatumId NOT NULL
 	stamp UTCTime NOT NULL
@@ -103,13 +103,13 @@ getView :: forall (m :: * -> *). Y.MonadIO m => ViewId -> Control.Monad.Trans.Re
 getView = Y.get
 
 
-mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Key LearnDatum
-mkLearnDatumKey = LearnDatumKey
+mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Unique LearnDatum
+mkLearnDatumKey = LearnItem
 
 
 mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> UTCTime -> LearnDatum
 mkLearnDatum = LearnDatum
 
 
-getLearnDatumKey :: Y.Key LearnDatum -> (ViewId, DataRowId, UserId)
-getLearnDatumKey (LearnDatumKey v i u) = (v, i, u)
+getLearnDatumKey :: Y.Unique LearnDatum -> (ViewId, DataRowId, UserId)
+getLearnDatumKey (LearnItem v i u) = (v, i, u)

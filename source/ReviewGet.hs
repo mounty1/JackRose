@@ -25,7 +25,7 @@ import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, getUserConfig, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
-import LearningData (ViewId, LearnDatumId, LearnDatum(..), newItem, dueItem, getLearnDatumKey)
+import LearningData (ViewId, LearnDatum(..), newItem, dueItem)
 import Data.Time (getCurrentTime)
 import Authorisation (UserId)
 import Database.Persist.Sqlite (runSqlPool)
@@ -36,7 +36,7 @@ import Database.Persist.Sql (SqlPersistT)
 import Control.Monad.Logger (LoggingT)
 
 
-type PresentationParams = (LearnDatumId, XML.Document)
+type PresentationParams = (Entity LearnDatum, XML.Document)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -96,7 +96,7 @@ tableList (UserDeck.SubDeck _ _ _ dex) = concatMap tableList dex
 
 
 getItemAndViewIds :: Entity LearnDatum -> PresentationParams
-getItemAndViewIds (Entity i _) = (i, XML.Document standardPrologue (embed [XML.NodeContent "obverse side"]) [])
+getItemAndViewIds item = (item, XML.Document standardPrologue (embed [XML.NodeContent "obverse side"]) [])
 
 
 searchForNew ::JRState.JRState -> UserId -> UserDeck.NewThrottle -> [ViewId] -> Foundation.Handler (Maybe PresentationParams)
@@ -109,10 +109,8 @@ runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn (JRState.
 
 -- put the necessary data into the session so that the POST knows what to add or update.
 rememberItem :: PresentationParams -> Foundation.Handler YC.Html
-rememberItem (item, document) = setSession "JR.view" (showt $ fromSqlKey viewId)
-		>> setSession "JR.row" (showt $ fromSqlKey rowId)
-		>> YC.liftIO (BZH.toHtml `fmap` return document) where
-		(viewId, rowId, _) = getLearnDatumKey item
+rememberItem (Entity itemId _, document) = setSession "JR.item" (showt $ fromSqlKey itemId)
+		>> YC.liftIO (BZH.toHtml `fmap` return document)
 
 
 mergeThrottle :: UserDeck.NewThrottle -> UserDeck.NewThrottle -> UserDeck.NewThrottle
