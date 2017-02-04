@@ -75,18 +75,23 @@ updateOneSource site schemeMap sourceRecord = liftIO (connection site (deSeriali
 	badConnString word = logWarnNS dataNameString (DT.concat [dataSourceString, ": error: ", word]) >> schemeMap
 
 	reSyncRows :: OpenDataSource -> DataSchemes
-	reSyncRows (OpenDataSource openConn colheads _ dataKeysList) = liftIO getCurrentTime >>= updateSync dataKeysList
-				>> schemeMap >>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn)
+	reSyncRows (OpenDataSource openConn colheads _ dataKeysList) = liftIO getCurrentTime
+		>>= updateSync dataKeysList
+		>> schemeMap
+		>>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn)
 
-	updateSync dataKeysList timeStamp = runSqlPool ((sequence $ map (insertRow timeStamp) dataKeysList) >>= (updateSource timeStamp) . DE.partitionEithers) (JRState.tablesFile site)
+	updateSync dataKeysList timeStamp = runSqlPool ((sequence $ map (insertRow timeStamp) dataKeysList)
+		>>= (updateSource timeStamp) . DE.partitionEithers) (JRState.tablesFile site)
 
 	insertRow timeStamp keyValue = insertBy $ LearningData.DataRow keyValue dataSourceKey timeStamp
 
 	-- Update time-stamp only if new data_rows were inserted.
 	updateSource :: UTCTime -> ([Entity LearningData.DataRow], [Key LearningData.DataRow]) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
 	updateSource _ (_, []) = return []
-	updateSource timeStamp (olds, newItems) = replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp} >>
-			userList >>= fmap concat . sequence . map viewByUser >>= fmap concat . sequence . map (insertLearnDatum timeStamp newItems)
+	updateSource timeStamp (olds, newItems) = replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}
+		>> userList
+		>>= fmap concat . sequence . map viewByUser
+		>>= fmap concat . sequence . map (insertLearnDatum timeStamp newItems)
 
 	viewByUser :: UserId -> RowResult (UserId, LearningData.ViewId)
 	viewByUser user = map (viewsPerUser user) `fmap` userDeckEnds user
@@ -108,39 +113,32 @@ data OpenDataSource = OpenDataSource DataHandle [DT.Text] [DT.Text] [DT.Text]
 -- Given a data-source code, open it and return the required parameters.
 connection :: JRState.JRState -> [DT.Text] -> IO (Either DT.Text OpenDataSource)
 
-connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername, maybePassword ] = catch (neoConn >>= pullStructure) sourceFail where
+connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername, maybePassword ] = catch (connectPostgreSQL connString >>= pullStructure) sourceFail where
 
-	neoConn = connectPostgreSQL $
-			"host=" ++ DT.unpack serverIP ++ "" ++
-			maybe "" (makeLabel " port") (maybeIntValue maybePort) ++
-			(if DT.null maybeDBase then "" else makeLabel " dbname" (DT.unpack maybeDBase)) ++
-			" user=" ++ (DT.unpack $ if DT.null maybeUsername then JRState.databaseUser site else maybeUsername) ++
-			(if DT.null maybePassword then "" else makeLabel " password" (DT.unpack maybePassword))
+	connString = "host=" ++ DT.unpack serverIP ++ ""
+		++ maybe "" (makeLabel " port") (maybeIntValue maybePort)
+		++ (if DT.null maybeDBase then "" else makeLabel " dbname" (DT.unpack maybeDBase))
+		++ " user=" ++ (DT.unpack $ if DT.null maybeUsername then JRState.databaseUser site else maybeUsername)
+		++ (if DT.null maybePassword then "" else makeLabel " password" (DT.unpack maybePassword))
 
 	pullStructure conn = HDBC.describeTable conn tableNameStr >>= mashIntoFields conn
 
-	mashIntoFields conn rows = HDBC.prepare conn primyKeyQuery >>=
-			exeStmt >>=
-			return . maybe [] (map DT.pack) . sequence . map head >>=
-			kazam where
+	mashIntoFields conn rows = HDBC.prepare conn primyKeyQuery
+		>>= exeStmt
+		>>= return . maybe [] (map DT.pack) . sequence . map head
+		>>= kazam conn rows
 
-			kazam primaryKey = HDBC.prepare conn primyKeyListQuery
-					>>= exeStmt
-					-- extract primary key value from row as [[Maybe String]] and convert to [DataRow]
-					-- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
-					>>= return . map (enSerialise . map DT.pack) . catMaybes . map sequence
-					>>= return . Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey where
-
-				-- SQL to select primary key data rows
-				primyKeyListQuery = "SELECT " ++ primyKeysForQ ++ " FROM \"" ++ DT.unpack dataTable ++ "\";"
-
-				-- comma-separated list of primary key fieldsKey
-				primyKeysForQ = DT.unpack $ DT.concat $ intersperse packedComma $ map enQuote primaryKey
+	kazam conn rows primaryKey = HDBC.prepare conn ("SELECT " ++ primyKeysForQ primaryKey ++ " FROM \"" ++ DT.unpack dataTable ++ "\";")
+		>>= exeStmt
+		-- extract primary key value from row as [[Maybe String]] and convert to [DataRow]
+		-- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
+		>>= return . map (enSerialise . map DT.pack) . catMaybes . map sequence
+		>>= return . Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey
 
 	sourceFail :: HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
 	sourceFail err = return $ Left $ DT.concat ["SQL error: ", DT.pack $ show err]
 
-	primyKeyQuery = "SELECT \"" ++ attName ++ "\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass ORDER BY a.attnum;"
+	primyKeyQuery = "SELECT \"attname\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass ORDER BY a.attnum;"
 
 	tableNameStr = DT.unpack dataTable
 
@@ -156,13 +154,14 @@ connection _site [ "X", _ffileXML ] = return $ Left "XML not implemented yet"
 connection _ connStr = return $ Left $ DT.concat ("invalid connection string: " : connStr)
 
 
+-- comma-separated list of primary key fieldsKey
+primyKeysForQ :: [DT.Text] -> String
+primyKeysForQ = DT.unpack . DT.concat . intersperse packedComma . map enQuote
+
+
 -- TODO actually look at the Integer returned and throw an error if necessary
 exeStmt :: Statement -> IO [[Maybe String]]
 exeStmt stmt = HDBC.sExecute stmt [] >> HDBC.sFetchAllRows stmt
-
-
-attName :: String
-attName = "attname"
 
 
 putColHead :: (String, HDBC.SqlColDesc) -> DT.Text
