@@ -18,7 +18,7 @@ Data sources may be updated externally to JR.
 module LearningResync (update) where
 
 
-import Data.Time (getCurrentTime)
+import Data.Time (getCurrentTime, UTCTime)
 import Control.Exception (catch)
 import Data.List (foldl', intersperse)
 import qualified Data.Map as DM (insert)
@@ -75,19 +75,26 @@ updateOneSource site schemeMap sourceRecord = liftIO (connection site (deSeriali
 	badConnString word = logWarnNS dataNameString (DT.concat [dataSourceString, ": error: ", word]) >> schemeMap
 
 	reSyncRows :: OpenDataSource -> DataSchemes
-	reSyncRows (OpenDataSource openConn colheads _ dataKeysList) = liftIO getCurrentTime >>= updateSync
-				>> schemeMap >>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn) where
-		updateSync timeStamp = runSqlPool ((sequence $ map insertRow dataKeysList) >>= updateSource . DE.partitionEithers) (JRState.tablesFile site) where
-			insertRow keyValue = insertBy $ LearningData.DataRow keyValue dataSourceKey timeStamp
-			-- Update time-stamp only replace if new data_rows were inserted.
-			updateSource :: ([Entity LearningData.DataRow], [Key LearningData.DataRow]) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
-			updateSource (_, []) = return []
-			updateSource (olds, newItems) = replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp} >>
-					userList >>= fmap concat . sequence . map viewByUser >>= fmap concat . sequence . map insertLearnDatum where
-				viewByUser :: UserId -> RowResult (UserId, LearningData.ViewId)
-				viewByUser user = (map (\(Entity _ view) -> (user, userDeckEndViewId view))) `fmap` userDeckEnds user
-				insertLearnDatum :: (UserId, LearningData.ViewId) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
-				insertLearnDatum (user, view) = sequence $ map (\itemId -> insertBy $ LearningData.mkLearnDatum view itemId user 0 timeStamp) newItems
+	reSyncRows (OpenDataSource openConn colheads _ dataKeysList) = liftIO getCurrentTime >>= updateSync dataKeysList
+				>> schemeMap >>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn)
+
+	updateSync dataKeysList timeStamp = runSqlPool ((sequence $ map (insertRow timeStamp) dataKeysList) >>= (updateSource timeStamp) . DE.partitionEithers) (JRState.tablesFile site)
+
+	insertRow timeStamp keyValue = insertBy $ LearningData.DataRow keyValue dataSourceKey timeStamp
+
+	-- Update time-stamp only if new data_rows were inserted.
+	updateSource :: UTCTime -> ([Entity LearningData.DataRow], [Key LearningData.DataRow]) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
+	updateSource _ (_, []) = return []
+	updateSource timeStamp (olds, newItems) = replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp} >>
+			userList >>= fmap concat . sequence . map viewByUser >>= fmap concat . sequence . map (insertLearnDatum timeStamp newItems)
+
+	viewByUser :: UserId -> RowResult (UserId, LearningData.ViewId)
+	viewByUser user = map (viewsPerUser user) `fmap` userDeckEnds user
+
+	viewsPerUser user (Entity _ view) = (user, userDeckEndViewId view)
+
+	insertLearnDatum :: UTCTime -> [Key LearningData.DataRow] -> (UserId, LearningData.ViewId) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
+	insertLearnDatum timeStamp newItems (user, view) = sequence $ map (\itemId -> insertBy $ LearningData.mkLearnDatum view itemId user 0 timeStamp) newItems
 
 	(Entity dataSourceKey dataSourceParts) = sourceRecord
 	dataSourceString = LearningData.dataSourceSourceSerial dataSourceParts
