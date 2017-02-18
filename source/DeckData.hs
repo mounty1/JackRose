@@ -11,14 +11,14 @@ Portability: undefined
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, RankNTypes, GeneralizedNewtypeDeriving, FlexibleInstances, DeriveGeneric #-}
 
 
-module DeckData (migrateData, userDeckNodes, userDeckEnds, UserDeckNode(..), UserDeckEnd(..), UserDeckNodeId, UserDeckEndId) where
+module DeckData (migrateData, userDeckNodes, userDeckEnds, userDeckEndsViewed, UserDeckNode(..), UserDeckEnd(..), UserDeckNodeId, UserDeckEndId) where
 
 
 import qualified Yesod as Y
 import qualified Data.Text as DT (Text)
 import Authorisation (UserId)
 import LearningData (ViewId)
-import Database.Persist (selectList, (==.))
+import Database.Persist (selectList, (==.), (<-.))
 import qualified Control.Monad.Trans.Reader (ReaderT)
 
 
@@ -45,3 +45,7 @@ userDeckNodes user = selectList [ UserDeckNodeUser ==. user ] []
 
 userDeckEnds :: forall (m :: * -> *). Y.MonadIO m => UserId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend UserDeckEnd) m [Y.Entity UserDeckEnd]
 userDeckEnds user = selectList [ UserDeckEndUser ==. user ] []
+
+
+userDeckEndsViewed :: forall (m :: * -> *). Y.MonadIO m => UserId -> [ViewId] -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend UserDeckEnd) m [Y.Entity UserDeckEnd]
+userDeckEndsViewed user views = selectList [ UserDeckEndUser ==. user, UserDeckEndViewId <-. views ] []

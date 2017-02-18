@@ -13,6 +13,7 @@ executable JackRose
                       yesod-auth,
                       yesod-auth-account,
                       yesod-auth-hashdb,
+                      data-ordlist,
                       text,
                       http-types,
                       bytestring,

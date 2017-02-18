@@ -88,7 +88,7 @@ topDeck site uid deckViews = runSqlPool (DD.userDeckEnds uid) (JRState.tablesFil
 			return . levelFilter isNothing deckViews (JRState.shuffleCards site) terminals
 
 
-levelFilter :: (Maybe DD.UserDeckNodeId -> Bool)  -> JRState.DataViews -> Bool -> [DPQ.Entity DD.UserDeckEnd] -> [DPQ.Entity DD.UserDeckNode] -> [UserDeck.UserDeckCpt]
+levelFilter :: (Maybe DD.UserDeckNodeId -> Bool) -> JRState.DataViews -> Bool -> [DPQ.Entity DD.UserDeckEnd] -> [DPQ.Entity DD.UserDeckNode] -> [UserDeck.UserDeckCpt]
 levelFilter criterion deckViews shuffleDeck terminals nodes =
 		map (fromTerm deckViews shuffleDeck) (filter (criterion . DD.userDeckEndParent . entityVal) terminals) ++
 		map (fromNode deckViews shuffleDeck terminals nodes) (filter (criterion . DD.userDeckNodeParent . entityVal) nodes)

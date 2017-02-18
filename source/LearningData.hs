@@ -29,10 +29,11 @@ module LearningData (migrateData,
 		dueItem,
 		newItem,
 		History(..),
-		getView,
+		deleteItems,
+		ascendingSourceKeys,
 		mkLearnDatum,
 		mkLearnDatumKey,
-		getLearnDatumKey) where
+		viewsOnDataSource) where
 
 
 import qualified Yesod as Y
@@ -40,12 +41,12 @@ import qualified Data.Text as DT (Text)
 import Authorisation (UserId)
 import Data.Int (Int8)
 import Data.Time (UTCTime)
-import Database.Persist (selectList, (<.), (==.), (<-.), SelectOpt(LimitTo) )
-import qualified Database.Persist.Sql (SqlBackend)
-import qualified Control.Monad.Trans.Reader (ReaderT)
+import Database.Persist (selectList, (<.), (==.), (<-.), SelectOpt(LimitTo, Asc), deleteCascadeWhere)
+import Database.Persist.Sql (SqlBackend)
+import Control.Monad.Trans.Reader (ReaderT)
 
 
-Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
+Y.share [Y.mkPersist Y.sqlSettings, Y.mkDeleteCascade Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
 DataSource
 	accessorWrite UserId NOT NULL
 	accessorRead UserId NOT NULL
@@ -78,29 +79,32 @@ History
 
 {- Activity:
 	0 new item
-	1 suspended
+	1 suspended by user
 	2 active
 	3 suppressed by selection criteria
 -}
 
-nextItem :: forall (m :: * -> *). Y.MonadIO m => Int8 -> [Y.Filter LearnDatum] -> UserId -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
+type PersistResult a = forall (m :: * -> *). Y.MonadIO m => ReaderT SqlBackend m a
+
+
+nextItem :: Int8 -> [Y.Filter LearnDatum] -> UserId -> [Y.Key View] -> PersistResult [Y.Entity LearnDatum]
 nextItem activityState extras user views = selectList ((LearnDatumActivity ==. activityState) : (LearnDatumUser ==. user) : (LearnDatumViewUID <-. views) : extras) [ LimitTo 1 ]
 
 
-newItem :: forall (m :: * -> *). Y.MonadIO m => UserId -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
+newItem :: UserId -> [Y.Key View] -> PersistResult [Y.Entity LearnDatum]
 newItem user views = nextItem 0 [] user views
 
 
-dueItem :: forall (m :: * -> *). Y.MonadIO m => UserId -> UTCTime -> [Y.Key View] -> Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend m [Y.Entity LearnDatum]
+dueItem :: UserId -> UTCTime -> [Y.Key View] -> PersistResult [Y.Entity LearnDatum]
 dueItem user stamp views = nextItem 2 [ LearnDatumNextReview <. stamp ] user views
 
 
-getDataRow :: forall (m :: * -> *). Y.MonadIO m => DataRowId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend DataRow) m (Maybe DataRow)
-getDataRow = Y.get
+ascendingSourceKeys :: Y.Key DataSource -> PersistResult [DT.Text]
+ascendingSourceKeys dsId = map pickKey `fmap` (selectList [ DataRowDataSourceRowId ==. dsId ] [Asc DataRowTableKey])
 
 
-getView :: forall (m :: * -> *). Y.MonadIO m => ViewId -> Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend View) m (Maybe View)
-getView = Y.get
+pickKey :: Y.Entity DataRow -> DT.Text
+pickKey (Y.Entity _ (DataRow key _ _)) = key
 
 
 mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Unique LearnDatum
@@ -111,5 +115,10 @@ mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> UTCTime -> LearnDat
 mkLearnDatum = LearnDatum
 
 
-getLearnDatumKey :: Y.Unique LearnDatum -> (ViewId, DataRowId, UserId)
-getLearnDatumKey (LearnItem v i u) = (v, i, u)
+deleteItems :: forall (m :: * -> *). Y.MonadIO m => [DT.Text] -> ReaderT (Y.PersistEntityBackend DataRow) m ()
+deleteItems deletees = deleteCascadeWhere [DataRowTableKey <-. deletees]
+
+
+-- | return list of views that refer to the given data source
+viewsOnDataSource :: Y.Key DataSource -> PersistResult [Y.Key View]
+viewsOnDataSource sourceId = map (\(Y.Entity vId _) -> vId) `fmap` selectList [ ViewDataSourceId ==. sourceId ] []

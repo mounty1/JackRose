@@ -24,7 +24,7 @@ import MaybeIntValue (maybeIntValue)
 
 -- | All the details to identify a data source without actually opening a connection to it.
 data DataVariant
-	= Postgres { server :: DT.Text, port :: Maybe Int, database ::Maybe  DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
+	= Postgres { server :: DT.Text, port :: Maybe Int, database :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
 	| Sqlite3 { tableName :: DT.Text }
 	| CSV { separator :: Char, fileCSV :: DT.Text }
 	| XMLSource { fileXML :: DT.Text }

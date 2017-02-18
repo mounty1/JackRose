@@ -21,31 +21,32 @@ module LearningResync (update) where
 import Data.Time (getCurrentTime, UTCTime)
 import Control.Exception (catch)
 import Data.List (foldl', intersperse)
+import Data.List.Ordered (minus)
+import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable, prepare, sExecute, sFetchAllRows)
 import qualified Data.Map as DM (insert)
 import qualified Data.Text as DT (Text, concat, pack, unpack, null)
-import Database.Persist.Sql (Entity(Entity), Key)
+import qualified JRState (JRState(..), runFilteredLoggingT)
+import Database.Persist.Sql (Entity(Entity), Key, fromSqlKey)
 import Database.Persist.Sqlite (runSqlPool, selectList)
 import Database.Persist (replace)
 import Database.Persist.Sql (insertBy)
 import TextList (enSerialise)
 import Data.Maybe (catMaybes)
-import qualified JRState (JRState(..), runFilteredLoggingT)
-import qualified LearningData (DataSource(..), DataRow(..), DataSourceId, LearnDatum, mkLearnDatum, ViewId)
-import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable, prepare, sExecute, sFetchAllRows)
+import LearningData (DataSource(..), DataRow(..), DataSourceId, LearnDatum(..), mkLearnDatum, ViewId, deleteItems, ascendingSourceKeys, viewsOnDataSource)
 import Database.HDBC.Statement (Statement)
 import Database.HDBC.PostgreSQL (connectPostgreSQL)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger (LoggingT, logWarnNS)
+import Control.Monad.Logger (LoggingT, logWarnNS, logErrorNS)
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar (modifyTVar')
 import ConnectionSpec (DataDescriptor(..), DataHandle(..))
 import MaybeIntValue (maybeIntValue)
 import TextList (deSerialise)
-import qualified Data.Either as DE (partitionEithers)
-import DeckData (userDeckEnds, userDeckEndViewId)
+import DeckData (userDeckEndsViewed, userDeckEndViewId, UserDeckEnd)
 import Authorisation (UserId, userList)
-import qualified Control.Monad.Trans.Reader (ReaderT)
-import qualified Database.Persist.Sql (SqlBackend)
+import Control.Monad.Trans.Reader (ReaderT)
+import Database.Persist.Sql (SqlBackend)
+import TextShow (showt)
 
 
 -- | Create handles or connections to all data sources;
@@ -62,13 +63,13 @@ update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (
 			>>= liftIO . atomically . modifyTVar' (JRState.dataSchemes site) . (flip $ foldr $ uncurry DM.insert)
 
 
-type DataSchemes = LoggingT IO [(LearningData.DataSourceId, DataDescriptor)]
+type DataSchemes = LoggingT IO [(DataSourceId, DataDescriptor)]
 
 
-type RowResult a = Control.Monad.Trans.Reader.ReaderT Database.Persist.Sql.SqlBackend (LoggingT IO) [a]
+type RowResult a = ReaderT SqlBackend (LoggingT IO) [a]
 
 
-updateOneSource :: JRState.JRState -> DataSchemes -> Entity LearningData.DataSource -> DataSchemes
+updateOneSource :: JRState.JRState -> DataSchemes -> Entity DataSource -> DataSchemes
 
 updateOneSource site schemeMap sourceRecord = liftIO (connection site (deSerialise dataSourceString)) >>= either badConnString reSyncRows where
 
@@ -78,32 +79,61 @@ updateOneSource site schemeMap sourceRecord = liftIO (connection site (deSeriali
 	reSyncRows (OpenDataSource openConn colheads _ dataKeysList) = liftIO getCurrentTime
 		>>= updateSync dataKeysList
 		>> schemeMap
-		>>= liftIO . return . (:) (dataSourceKey, DataDescriptor colheads dataSourceKey openConn)
+		>>= liftIO . return . (:) (dataSourceId, DataDescriptor colheads dataSourceId openConn)
 
-	updateSync dataKeysList timeStamp = runSqlPool ((sequence $ map (insertRow timeStamp) dataKeysList)
-		>>= (updateSource timeStamp) . DE.partitionEithers) (JRState.tablesFile site)
+	updateSync dataKeysList timeStamp = runSqlPool
+			(ascendingSourceKeys dataSourceId >>= updateSource timeStamp . partitionInsertResults dataKeysList)
+			(JRState.tablesFile site)
 
-	insertRow timeStamp keyValue = insertBy $ LearningData.DataRow keyValue dataSourceKey timeStamp
+	-- Update time-stamp only if new data_rows were inserted;  result is new rows inserted.
+	updateSource :: UTCTime -> ([DT.Text], [DT.Text]) -> RowResult (Key LearnDatum)
+	updateSource _ ([], []) = return []
+	updateSource timeStamp (deleted, newItems) = replace dataSourceId dataSourceParts{dataSourceResynced = timeStamp}
+		>> deleteItems deleted
+		>> viewsOnDataSource dataSourceId
+		>>= expandViewList
+		>>= \userViewPairs -> (fmap concat $ sequence $ map (insertDataRow userViewPairs timeStamp) newItems)
 
-	-- Update time-stamp only if new data_rows were inserted.
-	updateSource :: UTCTime -> ([Entity LearningData.DataRow], [Key LearningData.DataRow]) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
-	updateSource _ (_, []) = return []
-	updateSource timeStamp (olds, newItems) = replace dataSourceKey dataSourceParts{LearningData.dataSourceResynced = timeStamp}
-		>> userList
-		>>= fmap concat . sequence . map viewByUser
-		>>= fmap concat . sequence . map (insertLearnDatum timeStamp newItems)
+	-- insert new data row, then if successful, new learn datum for all valid combinations of (user, view)
+	insertDataRow :: [(UserId, ViewId)] -> UTCTime -> DT.Text -> RowResult (Key LearnDatum)
+	insertDataRow userViewPairs timeStamp itemKey = insertBy (DataRow itemKey dataSourceId timeStamp) >>= either alreadyDataRowHuh (insertLearnData userViewPairs timeStamp)
 
-	viewByUser :: UserId -> RowResult (UserId, LearningData.ViewId)
-	viewByUser user = map (viewsPerUser user) `fmap` userDeckEnds user
+	-- this was supposed to be a new row, but its record already exists.
+	alreadyDataRowHuh (Entity _ (DataRow k _ _)) = alreadyRowPresent "data row" k
 
-	viewsPerUser user (Entity _ view) = (user, userDeckEndViewId view)
+	-- data row inserted, so insert new learn data.
+	insertLearnData :: [(UserId, ViewId)] -> UTCTime -> Key DataRow -> RowResult (Key LearnDatum)
+	insertLearnData userViewPairs timeStamp rowId = fmap concat $ sequence $ map (insertLearnDatum timeStamp rowId) userViewPairs
 
-	insertLearnDatum :: UTCTime -> [Key LearningData.DataRow] -> (UserId, LearningData.ViewId) -> RowResult (Either (Entity LearningData.LearnDatum) (Key LearningData.LearnDatum))
-	insertLearnDatum timeStamp newItems (user, view) = sequence $ map (\itemId -> insertBy $ LearningData.mkLearnDatum view itemId user 0 timeStamp) newItems
+	-- insert one learn datum;  (return . return) makes a RowResult from a LearnDatum
+	insertLearnDatum :: UTCTime -> Key DataRow -> (UserId, ViewId) -> RowResult (Key LearnDatum)
+	insertLearnDatum timeStamp itemId (user, view) = insertBy(mkLearnDatum view itemId user 0 timeStamp) >>= either alreadyDatumHuh (return . return)
 
-	(Entity dataSourceKey dataSourceParts) = sourceRecord
-	dataSourceString = LearningData.dataSourceSourceSerial dataSourceParts
-	dataNameString = LearningData.dataSourceName dataSourceParts
+	-- as above, this should not happen.
+	alreadyDatumHuh (Entity _ (LearnDatum vId _ _ _ _)) = alreadyRowPresent "learn datum" (showt $ fromSqlKey vId)
+
+	alreadyRowPresent label rowId = logErrorNS dataNameString (DT.concat [dataSourceString, ": ", label, " \"", rowId, " already exists"]) >> return []
+
+	(Entity dataSourceId dataSourceParts) = sourceRecord
+	dataSourceString = dataSourceSourceSerial dataSourceParts
+	dataNameString = dataSourceName dataSourceParts
+
+
+-- this is where we would call isect to get the common (unchanged) keys, if we wanted them
+partitionInsertResults :: [DT.Text] -> [DT.Text] -> ([DT.Text], [DT.Text])
+partitionInsertResults sourceDataKeysList dataRowsAlready = (minus dataRowsAlready sourceDataKeysList, minus sourceDataKeysList dataRowsAlready)
+
+
+expandViewList :: [ViewId] -> RowResult (UserId, ViewId)
+expandViewList viewList = userList >>= fmap concat . sequence . map (thisViewByUser viewList)
+
+
+thisViewByUser :: [ViewId] -> UserId -> RowResult (UserId, ViewId)
+thisViewByUser views user = userDeckEndsViewed user views >>= return . map (viewsPerUser user)
+
+
+viewsPerUser :: UserId -> Entity UserDeckEnd -> (UserId, ViewId)
+viewsPerUser user (Entity _ view) = (user, userDeckEndViewId view)
 
 
 -- fields are:  opened handle/connection field_list key_list row_keys
@@ -115,11 +145,11 @@ connection :: JRState.JRState -> [DT.Text] -> IO (Either DT.Text OpenDataSource)
 
 connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername, maybePassword ] = catch (connectPostgreSQL connString >>= pullStructure) sourceFail where
 
-	connString = "host=" ++ DT.unpack serverIP ++ ""
-		++ maybe "" (makeLabel " port") (maybeIntValue maybePort)
-		++ (if DT.null maybeDBase then "" else makeLabel " dbname" (DT.unpack maybeDBase))
+	connString = "host=" ++ DT.unpack serverIP
+		++ maybe "" (makeLabel "port") (maybeIntValue maybePort)
+		++ (if DT.null maybeDBase then "" else makeLabel "dbname" (DT.unpack maybeDBase))
 		++ " user=" ++ (DT.unpack $ if DT.null maybeUsername then JRState.databaseUser site else maybeUsername)
-		++ (if DT.null maybePassword then "" else makeLabel " password" (DT.unpack maybePassword))
+		++ (if DT.null maybePassword then "" else makeLabel "password" (DT.unpack maybePassword))
 
 	pullStructure conn = HDBC.describeTable conn tableNameStr >>= mashIntoFields conn
 
@@ -128,21 +158,16 @@ connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername
 		>>= return . maybe [] (map DT.pack) . sequence . map head
 		>>= kazam conn rows
 
-	kazam conn rows primaryKey = HDBC.prepare conn ("SELECT " ++ primyKeysForQ primaryKey ++ " FROM \"" ++ DT.unpack dataTable ++ "\";")
+	kazam conn rows primaryKey = HDBC.prepare conn ("SELECT " ++ primyKeysForQ primaryKey ++ " FROM \"" ++ tableNameStr ++ "\";")
 		>>= exeStmt
 		-- extract primary key value from row as [[Maybe String]] and convert to [DataRow]
 		-- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
 		>>= return . map (enSerialise . map DT.pack) . catMaybes . map sequence
 		>>= return . Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey
 
-	sourceFail :: HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
-	sourceFail err = return $ Left $ DT.concat ["SQL error: ", DT.pack $ show err]
-
 	primyKeyQuery = "SELECT \"attname\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass ORDER BY a.attnum;"
 
 	tableNameStr = DT.unpack dataTable
-
-	makeLabel label value = label ++ "=\"" ++ show value ++ "\""
 
 
 connection _site [ "Q", _dtableName ] = return $ Left "SQLite not implemented yet"
@@ -154,9 +179,17 @@ connection _site [ "X", _ffileXML ] = return $ Left "XML not implemented yet"
 connection _ connStr = return $ Left $ DT.concat ("invalid connection string: " : connStr)
 
 
+sourceFail :: HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
+sourceFail err = return $ Left $ DT.concat ["SQL error: ", DT.pack $ show err]
+
+
+makeLabel :: Show a => String -> a -> String
+makeLabel label value = " " ++ label ++ "=\"" ++ show value ++ "\""
+
+
 -- comma-separated list of primary key fieldsKey
 primyKeysForQ :: [DT.Text] -> String
-primyKeysForQ = DT.unpack . DT.concat . intersperse packedComma . map enQuote
+primyKeysForQ = DT.unpack . DT.concat . intersperse "," . map enQuote
 
 
 -- TODO actually look at the Integer returned and throw an error if necessary
@@ -172,6 +205,5 @@ enQuote :: DT.Text -> DT.Text
 enQuote word = DT.concat [packedQuote, word, packedQuote]
 
 
-packedComma, packedQuote :: DT.Text
-packedComma = ","
+packedQuote :: DT.Text
 packedQuote = "\""
