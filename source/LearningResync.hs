@@ -71,7 +71,7 @@ type RowResult a = ReaderT SqlBackend (LoggingT IO) [a]
 
 updateOneSource :: JRState.JRState -> DataSchemes -> Entity DataSource -> DataSchemes
 
-updateOneSource site schemeMap sourceRecord = liftIO (connection site (deSerialise dataSourceString)) >>= either badConnString reSyncRows where
+updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (connection site (deSerialise dataSourceString)) >>= either badConnString reSyncRows where
 
 	badConnString word = logWarnNS dataNameString (DT.concat [dataSourceString, ": error: ", word]) >> schemeMap
 
@@ -114,7 +114,6 @@ updateOneSource site schemeMap sourceRecord = liftIO (connection site (deSeriali
 
 	alreadyRowPresent label rowId = logErrorNS dataNameString (DT.concat [dataSourceString, ": ", label, " \"", rowId, " already exists"]) >> return []
 
-	(Entity dataSourceId dataSourceParts) = sourceRecord
 	dataSourceString = dataSourceSourceSerial dataSourceParts
 	dataNameString = dataSourceName dataSourceParts
 
@@ -129,7 +128,7 @@ expandViewList viewList = userList >>= fmap concat . sequence . map (thisViewByU
 
 
 thisViewByUser :: [ViewId] -> UserId -> RowResult (UserId, ViewId)
-thisViewByUser views user = userDeckEndsViewed user views >>= return . map (viewsPerUser user)
+thisViewByUser views user = map (viewsPerUser user) `fmap` userDeckEndsViewed user views
 
 
 viewsPerUser :: UserId -> Entity UserDeckEnd -> (UserId, ViewId)

@@ -44,6 +44,7 @@ import Data.Time (UTCTime)
 import Database.Persist (selectList, (<.), (==.), (<-.), SelectOpt(LimitTo, Asc), deleteCascadeWhere)
 import Database.Persist.Sql (SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
+import Database.Persist.Types (entityKey)
 
 
 Y.share [Y.mkPersist Y.sqlSettings, Y.mkDeleteCascade Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
@@ -121,4 +122,4 @@ deleteItems deletees = deleteCascadeWhere [DataRowTableKey <-. deletees]
 
 -- | return list of views that refer to the given data source
 viewsOnDataSource :: Y.Key DataSource -> PersistResult [Y.Key View]
-viewsOnDataSource sourceId = map (\(Y.Entity vId _) -> vId) `fmap` selectList [ ViewDataSourceId ==. sourceId ] []
+viewsOnDataSource sourceId = map entityKey `fmap` selectList [ ViewDataSourceId ==. sourceId ] []
