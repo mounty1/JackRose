@@ -20,8 +20,7 @@ module LearningResync (update) where
 
 import Data.Time (getCurrentTime, UTCTime)
 import Control.Exception (catch)
-import Data.List (foldl', intersperse)
-import Data.List.Ordered (minus)
+import Data.List (foldl', intersperse, (\\))
 import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable, prepare, sExecute, sFetchAllRows)
 import qualified Data.Map as DM (insert)
 import qualified Data.Text as DT (Text, concat, pack, unpack, null)
@@ -120,7 +119,7 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 
 -- this is where we would call isect to get the common (unchanged) keys, if we wanted them
 partitionInsertResults :: [DT.Text] -> [DT.Text] -> ([DT.Text], [DT.Text])
-partitionInsertResults sourceDataKeysList dataRowsAlready = (minus dataRowsAlready sourceDataKeysList, minus sourceDataKeysList dataRowsAlready)
+partitionInsertResults sourceDataKeysList dataRowsAlready = (dataRowsAlready \\ sourceDataKeysList, sourceDataKeysList \\ dataRowsAlready)
 
 
 expandViewList :: [ViewId] -> RowResult (UserId, ViewId)
@@ -157,14 +156,15 @@ connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername
 		>>= return . maybe [] (map DT.pack) . sequence . map head
 		>>= kazam conn rows
 
-	kazam conn rows primaryKey = HDBC.prepare conn ("SELECT " ++ primyKeysForQ primaryKey ++ " FROM \"" ++ tableNameStr ++ "\";")
+	kazam conn rows primaryKey = HDBC.prepare conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" order by " ++ keysList ++ ";")
 		>>= exeStmt
 		-- extract primary key value from row as [[Maybe String]] and convert to [DataRow]
 		-- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
 		>>= return . map (enSerialise . map DT.pack) . catMaybes . map sequence
-		>>= return . Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey
+		>>= return . Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey where
+			keysList = primyKeysForQ primaryKey
 
-	primyKeyQuery = "SELECT \"attname\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass ORDER BY a.attnum;"
+	primyKeyQuery = "SELECT \"attname\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass AND i.indisprimary ORDER BY a.attnum;"
 
 	tableNameStr = DT.unpack dataTable
 

@@ -45,6 +45,7 @@ import Database.Persist (selectList, (<.), (==.), (<-.), SelectOpt(LimitTo, Asc)
 import Database.Persist.Sql (SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
 import Database.Persist.Types (entityKey)
+import SplitList (split)
 
 
 Y.share [Y.mkPersist Y.sqlSettings, Y.mkDeleteCascade Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
@@ -116,8 +117,8 @@ mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> UTCTime -> LearnDat
 mkLearnDatum = LearnDatum
 
 
-deleteItems :: forall (m :: * -> *). Y.MonadIO m => [DT.Text] -> ReaderT (Y.PersistEntityBackend DataRow) m ()
-deleteItems deletees = deleteCascadeWhere [DataRowTableKey <-. deletees]
+deleteItems :: forall (m :: * -> *). Y.MonadIO m => [DT.Text] -> ReaderT (Y.PersistEntityBackend DataRow) m [()]
+deleteItems deletees = sequence $ map (\portion -> deleteCascadeWhere [DataRowTableKey <-. portion]) $ split 10 deletees
 
 
 -- | return list of views that refer to the given data source
