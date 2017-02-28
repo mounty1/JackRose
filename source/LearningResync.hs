@@ -31,11 +31,11 @@ import Database.Persist (replace)
 import Database.Persist.Sql (insertBy)
 import TextList (enSerialise)
 import Data.Maybe (catMaybes)
-import LearningData (DataSource(..), DataRow(..), DataSourceId, LearnDatum(..), mkLearnDatum, ViewId, deleteItems, ascendingSourceKeys, viewsOnDataSource)
+import LearningData (DataSource(..), DataRow(..), DataSourceId, LearnDatum(..), mkLearnDatum, ViewId, deleteItems, allSourceKeys, viewsOnDataSource)
 import Database.HDBC.Statement (Statement)
 import Database.HDBC.PostgreSQL (connectPostgreSQL)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger (LoggingT, logWarnNS, logErrorNS)
+import Control.Monad.Logger (LoggingT, logInfoNS, logWarnNS, logErrorNS)
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar (modifyTVar')
 import ConnectionSpec (DataDescriptor(..), DataHandle(..))
@@ -81,14 +81,16 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 		>>= liftIO . return . (:) (dataSourceId, DataDescriptor colheads dataSourceId openConn)
 
 	updateSync dataKeysList timeStamp = runSqlPool
-			(ascendingSourceKeys dataSourceId >>= updateSource timeStamp . partitionInsertResults dataKeysList)
+			(allSourceKeys dataSourceId >>= updateSource timeStamp . partitionInsertResults dataKeysList)
 			(JRState.tablesFile site)
 
 	-- Update time-stamp only if new data_rows were inserted;  result is new rows inserted.
 	updateSource :: UTCTime -> ([DT.Text], [DT.Text]) -> RowResult (Key LearnDatum)
 	updateSource _ ([], []) = return []
 	updateSource timeStamp (deleted, newItems) = replace dataSourceId dataSourceParts{dataSourceResynced = timeStamp}
+		>> logKeyDelta "deleting" deleted
 		>> deleteItems deleted
+		>> logKeyDelta "adding" newItems
 		>> viewsOnDataSource dataSourceId
 		>>= expandViewList
 		>>= \userViewPairs -> (fmap concat $ sequence $ map (insertDataRow userViewPairs timeStamp) newItems)
@@ -111,13 +113,17 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 	-- as above, this should not happen.
 	alreadyDatumHuh (Entity _ (LearnDatum vId _ _ _ _)) = alreadyRowPresent "learn datum" (showt $ fromSqlKey vId)
 
-	alreadyRowPresent label rowId = logErrorNS dataNameString (DT.concat [dataSourceString, ": ", label, " \"", rowId, " already exists"]) >> return []
+	logKeyDelta label rowIds = sequence $ map (\rowId -> logInfoNS dataNameString $ DT.concat [dataSourceString, ": ", label, " \"", rowId, "\""]) rowIds
+
+	alreadyRowPresent label rowId = logErrorNS dataNameString (DT.concat [dataSourceString, ": ", label, " \"", rowId, "\" already exists"]) >> return []
 
 	dataSourceString = dataSourceSourceSerial dataSourceParts
 	dataNameString = dataSourceName dataSourceParts
 
 
--- this is where we would call isect to get the common (unchanged) keys, if we wanted them
+-- This is where we would call isect to get the common (unchanged) keys, if we wanted them.
+-- It is tempting to use Data.List.Ordered.minus instead of Data.List.(\\) but it seems not to work,
+-- probably over disagreement over collation arising from differences in character encoding.
 partitionInsertResults :: [DT.Text] -> [DT.Text] -> ([DT.Text], [DT.Text])
 partitionInsertResults sourceDataKeysList dataRowsAlready = (dataRowsAlready \\ sourceDataKeysList, sourceDataKeysList \\ dataRowsAlready)
 

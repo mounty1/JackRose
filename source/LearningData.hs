@@ -29,8 +29,9 @@ module LearningData (migrateData,
 		dueItem,
 		newItem,
 		History(..),
+		Y.get,
 		deleteItems,
-		ascendingSourceKeys,
+		allSourceKeys,
 		mkLearnDatum,
 		mkLearnDatumKey,
 		viewsOnDataSource) where
@@ -41,11 +42,12 @@ import qualified Data.Text as DT (Text)
 import Authorisation (UserId)
 import Data.Int (Int8)
 import Data.Time (UTCTime)
-import Database.Persist (selectList, (<.), (==.), (<-.), SelectOpt(LimitTo, Asc), deleteCascadeWhere)
+import Database.Persist (selectList, (<.), (==.), (<-.), SelectOpt(LimitTo), deleteCascadeWhere)
 import Database.Persist.Sql (SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
 import Database.Persist.Types (entityKey)
 import SplitList (split)
+import Data.Maybe (listToMaybe)
 
 
 Y.share [Y.mkPersist Y.sqlSettings, Y.mkDeleteCascade Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
@@ -88,21 +90,24 @@ History
 
 type PersistResult a = forall (m :: * -> *). Y.MonadIO m => ReaderT SqlBackend m a
 
-
-nextItem :: Int8 -> [Y.Filter LearnDatum] -> UserId -> [Y.Key View] -> PersistResult [Y.Entity LearnDatum]
-nextItem activityState extras user views = selectList ((LearnDatumActivity ==. activityState) : (LearnDatumUser ==. user) : (LearnDatumViewUID <-. views) : extras) [ LimitTo 1 ]
+type OneLearnPersist = PersistResult (Maybe (Y.Entity LearnDatum))
 
 
-newItem :: UserId -> [Y.Key View] -> PersistResult [Y.Entity LearnDatum]
+nextItem :: Int8 -> [Y.Filter LearnDatum] -> UserId -> [Y.Key View] -> OneLearnPersist
+-- It's a good idea to keep listToMaybe with LimitTo 1 because they make sense together.
+nextItem activityState extras user views = listToMaybe `fmap` selectList ((LearnDatumActivity ==. activityState) : (LearnDatumUser ==. user) : (LearnDatumViewUID <-. views) : extras) [ LimitTo 1 ]
+
+
+newItem :: UserId -> [Y.Key View] -> OneLearnPersist
 newItem user views = nextItem 0 [] user views
 
 
-dueItem :: UserId -> UTCTime -> [Y.Key View] -> PersistResult [Y.Entity LearnDatum]
+dueItem :: UserId -> UTCTime -> [Y.Key View] -> OneLearnPersist
 dueItem user stamp views = nextItem 2 [ LearnDatumNextReview <. stamp ] user views
 
 
-ascendingSourceKeys :: Y.Key DataSource -> PersistResult [DT.Text]
-ascendingSourceKeys dsId = map pickKey `fmap` (selectList [ DataRowDataSourceRowId ==. dsId ] [Asc DataRowTableKey])
+allSourceKeys :: Y.Key DataSource -> PersistResult [DT.Text]
+allSourceKeys dsId = map pickKey `fmap` (selectList [ DataRowDataSourceRowId ==. dsId ] [])
 
 
 pickKey :: Y.Entity DataRow -> DT.Text
@@ -118,6 +123,7 @@ mkLearnDatum = LearnDatum
 
 
 deleteItems :: forall (m :: * -> *). Y.MonadIO m => [DT.Text] -> ReaderT (Y.PersistEntityBackend DataRow) m [()]
+-- break up the deletion into chunks in order not to have too many variables in the SQL statement
 deleteItems deletees = sequence $ map (\portion -> deleteCascadeWhere [DataRowTableKey <-. portion]) $ split 10 deletees
 
 

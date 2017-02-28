@@ -8,7 +8,7 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, RankNTypes #-}
 
 
 module ReviewGet (getHomeR, getReviewR) where
@@ -25,18 +25,20 @@ import qualified Data.List as DL (intersperse, filter)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, getUserConfig, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
-import LearningData (ViewId, LearnDatum(..), newItem, dueItem)
+import LearningData (ViewId, LearnDatum(..), DataRow(..), newItem, dueItem)
+import qualified LearningData (get)
 import Data.Time (getCurrentTime)
 import Authorisation (UserId)
 import Database.Persist.Sqlite (runSqlPool)
 import TextShow (showt)
-import Data.Maybe (listToMaybe)
 import Database.Persist.Sql (Entity(Entity), fromSqlKey)
 import Database.Persist.Sql (SqlPersistT)
 import Control.Monad.Logger (LoggingT)
+import Control.Monad.Trans.Reader (ReaderT)
+import Database.Persist.Sql (SqlBackend)
 
 
-type PresentationParams = (Entity LearnDatum, XML.Document)
+type PresentationParams = Either DT.Text (Entity LearnDatum, XML.Document)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -50,7 +52,7 @@ getReviewR deckSteck = onlyIfAuthorised (review $ splitSlash deckSteck)
 
 
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
-review deckPath {- | e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod >>= zappo where
+review deckPath {- e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod >>= zappo where
 		-- TODO: for no-user case, just go back to the login screen, but with the message;  then lose informationMessage
 			zappo site = (YC.liftIO $ JRState.getUserConfig site) >>=
 				maybe (informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath) . DM.lookup username
@@ -95,22 +97,26 @@ tableList (UserDeck.TableView _ _ vid _) = [vid]
 tableList (UserDeck.SubDeck _ _ _ dex) = concatMap tableList dex
 
 
-getItemAndViewIds :: Entity LearnDatum -> PresentationParams
-getItemAndViewIds item = (item, XML.Document standardPrologue (embed [XML.NodeContent "obverse side"]) [])
-
-
 searchForNew ::JRState.JRState -> UserId -> UserDeck.NewThrottle -> [ViewId] -> Foundation.Handler (Maybe PresentationParams)
 searchForNew site userId throttle views = runItemQuery site (newItem userId views)
 
 
-runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> SqlPersistT (LoggingT m) [Entity LearnDatum] -> m (Maybe PresentationParams)
-runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn (JRState.tablesFile site)) >>= return . fmap getItemAndViewIds . listToMaybe
+runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> SqlPersistT (LoggingT m) (Maybe (Entity LearnDatum)) -> m (Maybe PresentationParams)
+runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) where
+	fn2 = fn >>= maybe (return Nothing) getItemAndViewIds
+
+
+getItemAndViewIds :: YC.MonadIO m => Entity LearnDatum -> ReaderT SqlBackend m (Maybe PresentationParams)
+getItemAndViewIds item@(Entity _ (LearnDatum view itemId _ _ _)) = LearningData.get itemId >>= maybe itemUnfound formatItem where
+	itemUnfound = return $ Just $ Left "no data row"
+	formatItem (DataRow key source loaded) = return $ Just $ Right (item, documentHTML key)
 
 
 -- put the necessary data into the session so that the POST knows what to add or update.
 rememberItem :: PresentationParams -> Foundation.Handler YC.Html
-rememberItem (Entity itemId _, document) = setSession "JR.item" (showt $ fromSqlKey itemId)
-		>> YC.liftIO (BZH.toHtml `fmap` return document)
+rememberItem (Left errCode) = informationMessage errCode
+rememberItem (Right (Entity itemId _, document)) = setSession "JR.item" (showt $ fromSqlKey itemId)
+		>> (YC.liftIO $ return $ BZH.toHtml document)
 
 
 mergeThrottle :: UserDeck.NewThrottle -> UserDeck.NewThrottle -> UserDeck.NewThrottle
@@ -120,11 +126,11 @@ mergeThrottle a@(Just already) n@(Just newThrottle) = if already < newThrottle t
 
 
 informationMessage :: DT.Text -> Foundation.Handler YC.Html
-informationMessage message = YC.liftIO $ fmap BZH.toHtml $ documentHTML [XML.NodeContent message]
+informationMessage message = YC.liftIO $ return $ BZH.toHtml $ documentHTML message
 
 
-documentHTML :: [XML.Node] -> IO XML.Document
-documentHTML content = return $ XML.Document standardPrologue (embed content) []
+documentHTML :: DT.Text -> XML.Document
+documentHTML content = XML.Document standardPrologue (embed [XML.NodeContent content]) []
 
 
 standardPrologue :: XML.Prologue

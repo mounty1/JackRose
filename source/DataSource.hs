@@ -40,7 +40,7 @@ showMT = maybe DT.empty id
 
 -- TODO we don't need this;  replace with something that validates JSON input or similar.
 enSerialise :: DataVariant -> DT.Text
-enSerialise (Postgres serverIP portNo dbase nameSpace dtable userName passWord) = DL.enSerialise [ "P", serverIP, showMI portNo, showMT dbase, dtable, showMT userName, showMT passWord ]
+enSerialise (Postgres serverIP portNo dbase dtable userName passWord) = DL.enSerialise [ "P", serverIP, showMI portNo, showMT dbase, dtable, showMT userName, showMT passWord ]
 enSerialise (Sqlite3 dtableName) = DL.enSerialise [ "Q", dtableName ]
 enSerialise (CSV recseparator ffileCSV) = DL.enSerialise [ "C", DT.singleton recseparator, ffileCSV ]
 enSerialise (XMLSource ffileXML) = DL.enSerialise [ "X", ffileXML ]
