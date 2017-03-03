@@ -13,12 +13,11 @@ module ConnectionSpec where
 
 import Data.Text (Text)
 import Database.HDBC.PostgreSQL (Connection)
-import LearningData (DataSourceId)
 
 
 data DataDescriptor = DataDescriptor {
 	columnNames :: [Text],
-	sourceId :: DataSourceId,
+	primaryKeys :: [Text],
 	openConnection :: DataHandle	-- the connection is specified by the DataSourceId, but this is the opened handle
 }
 

@@ -21,7 +21,7 @@ module LearningResync (update) where
 import Data.Time (getCurrentTime, UTCTime)
 import Control.Exception (catch)
 import Data.List (foldl', intersperse, (\\))
-import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable, prepare, sExecute, sFetchAllRows)
+import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable)
 import qualified Data.Map as DM (insert)
 import qualified Data.Text as DT (Text, concat, pack, unpack, null)
 import qualified JRState (JRState(..), runFilteredLoggingT)
@@ -32,7 +32,6 @@ import Database.Persist.Sql (insertBy)
 import TextList (enSerialise)
 import Data.Maybe (catMaybes)
 import LearningData (DataSource(..), DataRow(..), DataSourceId, LearnDatum(..), mkLearnDatum, ViewId, deleteItems, allSourceKeys, viewsOnDataSource)
-import Database.HDBC.Statement (Statement)
 import Database.HDBC.PostgreSQL (connectPostgreSQL)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Logger (LoggingT, logInfoNS, logWarnNS, logErrorNS)
@@ -46,10 +45,11 @@ import Authorisation (UserId, userList)
 import Control.Monad.Trans.Reader (ReaderT)
 import Database.Persist.Sql (SqlBackend)
 import TextShow (showt)
+import ExecuteSqlStmt (exeStmt)
 
 
 -- | Create handles or connections to all data sources;
--- | then read them to be sure all records are known.
+-- then read them to be sure all records are known.
 update :: JRState.JRState -> IO ()
 update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (JRState.tablesFile site)
 			-- convert the list of data-source rcords into a map of open connections
@@ -75,10 +75,10 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 	badConnString word = logWarnNS dataNameString (DT.concat [dataSourceString, ": error: ", word]) >> schemeMap
 
 	reSyncRows :: OpenDataSource -> DataSchemes
-	reSyncRows (OpenDataSource openConn colheads _ dataKeysList) = liftIO getCurrentTime
+	reSyncRows (OpenDataSource openConn colheads primyKeys dataKeysList) = liftIO getCurrentTime
 		>>= updateSync dataKeysList
 		>> schemeMap
-		>>= liftIO . return . (:) (dataSourceId, DataDescriptor colheads dataSourceId openConn)
+		>>= liftIO . return . (:) (dataSourceId, DataDescriptor colheads primyKeys openConn)
 
 	updateSync dataKeysList timeStamp = runSqlPool
 			(allSourceKeys dataSourceId >>= updateSource timeStamp . partitionInsertResults dataKeysList)
@@ -157,13 +157,11 @@ connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername
 
 	pullStructure conn = HDBC.describeTable conn tableNameStr >>= mashIntoFields conn
 
-	mashIntoFields conn rows = HDBC.prepare conn primyKeyQuery
-		>>= exeStmt
+	mashIntoFields conn rows = exeStmt conn primyKeyQuery []
 		>>= return . maybe [] (map DT.pack) . sequence . map head
 		>>= kazam conn rows
 
-	kazam conn rows primaryKey = HDBC.prepare conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" order by " ++ keysList ++ ";")
-		>>= exeStmt
+	kazam conn rows primaryKey = exeStmt conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" order by " ++ keysList ++ ";") []
 		-- extract primary key value from row as [[Maybe String]] and convert to [DataRow]
 		-- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
 		>>= return . map (enSerialise . map DT.pack) . catMaybes . map sequence
@@ -185,7 +183,7 @@ connection _ connStr = return $ Left $ DT.concat ("invalid connection string: " 
 
 
 sourceFail :: HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
-sourceFail err = return $ Left $ DT.concat ["SQL error: ", DT.pack $ show err]
+sourceFail = return . Left . DT.pack . show
 
 
 makeLabel :: Show a => String -> a -> String
@@ -195,11 +193,6 @@ makeLabel label value = " " ++ label ++ "=\"" ++ show value ++ "\""
 -- comma-separated list of primary key fieldsKey
 primyKeysForQ :: [DT.Text] -> String
 primyKeysForQ = DT.unpack . DT.concat . intersperse "," . map enQuote
-
-
--- TODO actually look at the Integer returned and throw an error if necessary
-exeStmt :: Statement -> IO [[Maybe String]]
-exeStmt stmt = HDBC.sExecute stmt [] >> HDBC.sFetchAllRows stmt
 
 
 putColHead :: (String, HDBC.SqlColDesc) -> DT.Text

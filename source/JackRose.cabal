@@ -50,6 +50,7 @@ executable JackRose
                       DeckSpec
                       DataSource
                       EmailVerification
+                      ExecuteSqlStmt
                       FailureMessage
                       Foundation
                       GoHome

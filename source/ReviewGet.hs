@@ -17,15 +17,15 @@ module ReviewGet (getHomeR, getReviewR) where
 import qualified Yesod.Core as YC
 import Yesod.Core.Handler (setSession)
 import qualified Foundation (Handler)
-import qualified Data.Text as DT (Text, split, singleton, concat, null)
+import qualified Data.Text as DT (Text, split, singleton, concat, null, unpack, pack)
 import qualified Text.XML as XML
 import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
-import qualified Data.List as DL (intersperse, filter)
+import qualified Data.List as DL (intersperse, filter, concat)
 import LoginPlease (onlyIfAuthorised)
-import qualified JRState (runFilteredLoggingT, getUserConfig, JRState, tablesFile)
+import qualified JRState (runFilteredLoggingT, getUserConfig, getDataSchemes, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
-import LearningData (ViewId, LearnDatum(..), DataRow(..), newItem, dueItem)
+import LearningData (ViewId, LearnDatum(..), DataRow(..), DataSourceId, newItem, dueItem)
 import qualified LearningData (get)
 import Data.Time (getCurrentTime)
 import Authorisation (UserId)
@@ -36,9 +36,16 @@ import Database.Persist.Sql (SqlPersistT)
 import Control.Monad.Logger (LoggingT)
 import Control.Monad.Trans.Reader (ReaderT)
 import Database.Persist.Sql (SqlBackend)
+import ConnectionSpec (DataDescriptor(..), DataHandle(..))
+import ExecuteSqlStmt (exeStmt)
+import TextList (deSerialise)
+import Data.Maybe (fromMaybe)
 
 
 type PresentationParams = Either DT.Text (Entity LearnDatum, XML.Document)
+
+
+type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) =>  ReaderT SqlBackend m (Maybe PresentationParams)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -104,15 +111,33 @@ searchForNew site userId throttle views = runItemQuery site (newItem userId view
 runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> SqlPersistT (LoggingT m) (Maybe (Entity LearnDatum)) -> m (Maybe PresentationParams)
 runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) where
 	fn2 = fn >>= maybe (return Nothing) getItemAndViewIds
+	getItemAndViewIds :: Entity LearnDatum -> LearnItemParameters
+	getItemAndViewIds item@(Entity _ (LearnDatum view itemId _ _ _)) = LearningData.get itemId >>= maybe itemUnfound (formatItem item)
+	itemUnfound :: LearnItemParameters
+	itemUnfound = YC.liftIO $ return $ Just $ Left "no data row"
+	formatItem :: Entity LearnDatum -> DataRow -> LearnItemParameters
+	formatItem itemId (DataRow key source loaded) = YC.liftIO (JRState.getDataSchemes site) >>= \schemes -> maybe (noSource source) (readFromSource itemId key) (DM.lookup source schemes)
+	noSource :: DataSourceId -> LearnItemParameters
+	noSource source = YC.liftIO $ return $ Just $ Left $ DT.concat ["data source lost: ", showt $ fromSqlKey source]
+	readFromSource :: Entity LearnDatum -> DT.Text -> DataDescriptor -> LearnItemParameters
+	readFromSource itemId key (DataDescriptor cols keys1y handle) = YC.liftIO $ readExternalDataSourceRecord key cols keys1y handle >>= return . Just . Right . (\it -> (itemId, it)) . documentHTML . DT.pack . extractField
 
 
-getItemAndViewIds :: YC.MonadIO m => Entity LearnDatum -> ReaderT SqlBackend m (Maybe PresentationParams)
-getItemAndViewIds item@(Entity _ (LearnDatum view itemId _ _ _)) = LearningData.get itemId >>= maybe itemUnfound formatItem where
-	itemUnfound = return $ Just $ Left "no data row"
-	formatItem (DataRow key source loaded) = return $ Just $ Right (item, documentHTML key)
+readExternalDataSourceRecord :: DT.Text -> [DT.Text] -> [DT.Text] -> DataHandle -> IO [[Maybe String]]
+readExternalDataSourceRecord key cols keys1y (Postgres conn table) = exeStmt conn ("SELECT * FROM \"" ++ DT.unpack table ++ "\" WHERE " ++ mkSqlWhereClause keys1y ++ ";") (map DT.unpack $ deSerialise key)
+
+
+mkSqlWhereClause :: [DT.Text] -> String
+mkSqlWhereClause keysList = DL.concat $ DL.intersperse " AND " $ map (\key -> "(\"" ++ DT.unpack key ++ "\"=?)") keysList
+
+
+extractField :: [[Maybe String]] -> String
+-- TODO handle 0 and multiple rows
+extractField [list] = fromMaybe "<null field>" $ list !! 5
 
 
 -- put the necessary data into the session so that the POST knows what to add or update.
+-- TODO a Left indicates inconsistency in the data, so really we should log every one out and fix it.
 rememberItem :: PresentationParams -> Foundation.Handler YC.Html
 rememberItem (Left errCode) = informationMessage errCode
 rememberItem (Right (Entity itemId _, document)) = setSession "JR.item" (showt $ fromSqlKey itemId)
