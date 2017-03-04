@@ -8,7 +8,7 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, RankNTypes #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, RankNTypes, KindSignatures #-}
 
 
 module ReviewGet (getHomeR, getReviewR) where
@@ -25,27 +25,26 @@ import qualified Data.List as DL (intersperse, filter, concat)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, getUserConfig, getDataSchemes, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
-import LearningData (ViewId, LearnDatum(..), DataRow(..), DataSourceId, newItem, dueItem)
-import qualified LearningData (get)
+import LearningData (ViewId, LearnDatum(..), DataRow(..), newItem, dueItem)
+import qualified LearningData (get, View(..))
 import Data.Time (getCurrentTime)
 import Authorisation (UserId)
 import Database.Persist.Sqlite (runSqlPool)
 import TextShow (showt)
-import Database.Persist.Sql (Entity(Entity), fromSqlKey)
-import Database.Persist.Sql (SqlPersistT)
+import Database.Persist.Sql (Entity(Entity), fromSqlKey, Key, SqlPersistT, SqlBackend)
 import Control.Monad.Logger (LoggingT)
 import Control.Monad.Trans.Reader (ReaderT)
-import Database.Persist.Sql (SqlBackend)
 import ConnectionSpec (DataDescriptor(..), DataHandle(..))
 import ExecuteSqlStmt (exeStmt)
 import TextList (deSerialise)
 import Data.Maybe (fromMaybe)
+import Database.Persist (ToBackendKey)
 
 
 type PresentationParams = Either DT.Text (Entity LearnDatum, XML.Document)
 
 
-type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) =>  ReaderT SqlBackend m (Maybe PresentationParams)
+type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) => ReaderT SqlBackend m (Maybe PresentationParams)
 
 
 -- | verify that a user be logged-in, and if s/he be, present the next item for review.
@@ -55,7 +54,7 @@ getHomeR = onlyIfAuthorised (review [])
 
 -- | show next item for review, for the logged-in user
 getReviewR :: DT.Text -> Foundation.Handler YC.Html
-getReviewR deckSteck = onlyIfAuthorised (review $ splitSlash deckSteck)
+getReviewR = onlyIfAuthorised . review . splitSlash
 
 
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
@@ -100,7 +99,7 @@ searchForExistingByTable site userId views =YC.liftIO $ getCurrentTime >>= showC
 
 
 tableList :: UserDeck.UserDeckCpt -> [ViewId]
-tableList (UserDeck.TableView _ _ vid _) = [vid]
+tableList (UserDeck.TableView _ _ vid) = [vid]
 tableList (UserDeck.SubDeck _ _ _ dex) = concatMap tableList dex
 
 
@@ -110,17 +109,31 @@ searchForNew site userId throttle views = runItemQuery site (newItem userId view
 
 runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> SqlPersistT (LoggingT m) (Maybe (Entity LearnDatum)) -> m (Maybe PresentationParams)
 runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) where
+
 	fn2 = fn >>= maybe (return Nothing) getItemAndViewIds
+
 	getItemAndViewIds :: Entity LearnDatum -> LearnItemParameters
-	getItemAndViewIds item@(Entity _ (LearnDatum view itemId _ _ _)) = LearningData.get itemId >>= maybe itemUnfound (formatItem item)
-	itemUnfound :: LearnItemParameters
-	itemUnfound = YC.liftIO $ return $ Just $ Left "no data row"
+	getItemAndViewIds item@(Entity _ (LearnDatum _ itemId _ _ _)) = LearningData.get itemId
+			>>= maybe (noSomething "data row" itemId) (formatItem item)
+
 	formatItem :: Entity LearnDatum -> DataRow -> LearnItemParameters
-	formatItem itemId (DataRow key source loaded) = YC.liftIO (JRState.getDataSchemes site) >>= \schemes -> maybe (noSource source) (readFromSource itemId key) (DM.lookup source schemes)
-	noSource :: DataSourceId -> LearnItemParameters
-	noSource source = YC.liftIO $ return $ Just $ Left $ DT.concat ["data source lost: ", showt $ fromSqlKey source]
-	readFromSource :: Entity LearnDatum -> DT.Text -> DataDescriptor -> LearnItemParameters
-	readFromSource itemId key (DataDescriptor cols keys1y handle) = YC.liftIO $ readExternalDataSourceRecord key cols keys1y handle >>= return . Just . Right . (\it -> (itemId, it)) . documentHTML . DT.pack . extractField
+	formatItem item (DataRow key source _) = YC.liftIO (JRState.getDataSchemes site)
+			>>= maybe (noSomething "live data source" source) (readFromView item key) . DM.lookup source
+
+	readFromView :: Entity LearnDatum -> DT.Text -> DataDescriptor -> LearnItemParameters
+	readFromView item@(Entity _ (LearnDatum viewId _ _ _ _)) key descriptor = LearningData.get viewId
+			>>= maybe (noSomething "view" viewId) (readFromSource item key descriptor)
+
+
+noSomething :: (ToBackendKey SqlBackend record) => DT.Text -> Key record -> LearnItemParameters
+noSomething label item = YC.liftIO $ return $ Just $ Left $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
+
+
+readFromSource :: Entity LearnDatum -> DT.Text -> DataDescriptor ->  LearningData.View -> LearnItemParameters
+readFromSource item@(Entity _ (LearnDatum viewId _ _ _ _)) key (DataDescriptor cols keys1y handle) (LearningData.View _ _ obverse _) =
+	YC.liftIO $
+		readExternalDataSourceRecord key cols keys1y handle
+			>>= return . Just . Right . ((,) item) . documentHTML . DT.pack . extractField cols obverse
 
 
 readExternalDataSourceRecord :: DT.Text -> [DT.Text] -> [DT.Text] -> DataHandle -> IO [[Maybe String]]
@@ -131,9 +144,9 @@ mkSqlWhereClause :: [DT.Text] -> String
 mkSqlWhereClause keysList = DL.concat $ DL.intersperse " AND " $ map (\key -> "(\"" ++ DT.unpack key ++ "\"=?)") keysList
 
 
-extractField :: [[Maybe String]] -> String
+extractField :: [DT.Text] -> DT.Text -> [[Maybe String]] -> String
 -- TODO handle 0 and multiple rows
-extractField [list] = fromMaybe "<null field>" $ list !! 5
+extractField cols template [list] = fromMaybe "<null field>" $ list !! 5
 
 
 -- put the necessary data into the session so that the POST knows what to add or update.
@@ -155,7 +168,7 @@ informationMessage message = YC.liftIO $ return $ BZH.toHtml $ documentHTML mess
 
 
 documentHTML :: DT.Text -> XML.Document
-documentHTML content = XML.Document standardPrologue (embed [XML.NodeContent content]) []
+documentHTML content = XML.Document standardPrologue (embed [XML.NodeContent content] okButton) []
 
 
 standardPrologue :: XML.Prologue
@@ -166,8 +179,8 @@ standardPrologue =
 		[]
 
 
-embed :: [XML.Node] -> XML.Element
-embed content =
+embed :: [XML.Node] -> [XML.Node] -> XML.Element
+embed content nextButton =
 	XML.Element
 		(nameXML "html")
 		DM.empty
@@ -193,9 +206,7 @@ embed content =
 						[makeNode "form" postAttr [button1 "stats"]],
 					makeNode "td"
 						(alignAttr "center")
-						[makeNode "form"
-							postAttr
-							(DL.intersperse oneSpace $ map gradeButton ['0' .. '9'])],
+						[makeNode "form" postAttr nextButton],
 					makeNode "td"
 						(alignAttr "right")
 						[makeNode "form" postAttr [button1 "logout"]]
@@ -203,6 +214,15 @@ embed content =
 			]
 		]
 	]
+
+
+okButton, gradeButtons :: [XML.Node]
+
+
+okButton = [button1 "OK"]
+
+
+gradeButtons = DL.intersperse oneSpace $ map gradeButton ['0' .. '9']
 
 
 oneSpace :: XML.Node
@@ -245,40 +265,13 @@ gradeButton digit = button "grade" (DT.singleton digit)
 
 ceeSS :: DT.Text
 ceeSS = ".all {\n\
-     \font-family: Code2000;\n\
-     \font-size: 24pt;\n\
-     \background-color: #00ff80;\n\
-     \text-align: center;\n\
+	\font-family: Code2000;\n\
+	\font-size: 24pt;\n\
+	\background-color: #00ff80;\n\
+	\text-align: center;\n\
 \}\n\
 \td {\n\
-     \text-align: left;\n\
-\}\n\
-\.greek {\n\
-     \color: #20198c;\n\
-\}\n\
-\*[mood=I]::before { content: \"Ⓘ\"; }\n\
-\*[mood=i]::before { content: \"ⓘ\"; }\n\
-\*[mood=O]::before { content: \"Ⓞ\"; }\n\
-\*[mood=S]::before { content: \"Ⓢ\"; }\n\
-\*[tense=r]::after { content: \"præs.\"; }\n\
-\*[tense=f]::after { content: \"fut.\"; }\n\
-\*[tense=m]::after { content: \"impf.\"; }\n\
-\*[tense=R]::after { content: \"Ⓡ\"; }\n\
-\*[tense=k]::after { content: \"perf.\"; }\n\
-\*[tense=Q]::after { content: \"Ⓠ\"; }\n\
-\*[voice=A]::after { content: \"Ⓐ\"; }\n\
-\*[voice=M]::after { content: \"Ⓜ\"; }\n\
-\*[voice=MP]::after { content: \"ⓂⓅ\"; }\n\
-\*[voice=D]::after { content: \"Ⓟ\"; }\n\
-\.comment {\n\
-     \font-size: 16pt;\n\
-     \font-style: italic;\n\
-     \text-align: left;\n\
-\}\n\
-\.instruction {\n\
-     \text-align: right;\n\
-     \font-size: 20pt;\n\
-     \font-style: italic;\n\
+	\text-align: left;\n\
 \}\n\
 \* {\n\
 	\margin: 0;\n\
@@ -296,6 +289,6 @@ ceeSS = ".all {\n\
 	\height: 1em;\n\
 \}\n\
 \html body table tbody tr td form {\n\
-     \font-size: 20pt;\n\
+	\font-size: 20pt;\n\
 	\text-align: center;\n\
 \}"

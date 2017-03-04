@@ -45,7 +45,6 @@ executable JackRose
                       Authorisation
                       CommandArgs
                       ConnectionSpec
-                      ViewSpec
                       DeckData
                       DeckSpec
                       DataSource

@@ -19,7 +19,6 @@ module DataSource (enSerialise) where
 import TextShow (showt)
 import qualified Data.Text as DT (Text, singleton, empty, null, head, length)
 import qualified TextList as DL (enSerialise, deSerialise)
-import MaybeIntValue (maybeIntValue)
 
 
 -- | All the details to identify a data source without actually opening a connection to it.

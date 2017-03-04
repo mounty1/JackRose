@@ -13,7 +13,6 @@ module UserDeck where
 
 import Data.Text (Text)
 import LearningData (ViewId)
-import ConnectionSpec (DataDescriptor)
 
 
 type NewThrottle = Maybe Int
@@ -29,6 +28,5 @@ data UserDeckCpt =
 	TableView {
 		throttle :: NewThrottle,
 		shuffle :: Bool,
-		vid :: ViewId,
-		handle :: DataDescriptor
+		vid :: ViewId
 	}
