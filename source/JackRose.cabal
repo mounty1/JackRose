@@ -43,6 +43,7 @@ executable JackRose
   other-modules:      Application
                       AuthoriStyle
                       Authorisation
+                      CardExpand
                       CommandArgs
                       ConnectionSpec
                       DeckData

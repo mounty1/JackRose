@@ -17,7 +17,7 @@ module ReviewGet (getHomeR, getReviewR) where
 import qualified Yesod.Core as YC
 import Yesod.Core.Handler (setSession)
 import qualified Foundation (Handler)
-import qualified Data.Text as DT (Text, split, singleton, concat, null, unpack, pack)
+import qualified Data.Text as DT (Text, split, singleton, concat, null, unpack)
 import qualified Text.XML as XML
 import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
@@ -37,8 +37,8 @@ import Control.Monad.Trans.Reader (ReaderT)
 import ConnectionSpec (DataDescriptor(..), DataHandle(..))
 import ExecuteSqlStmt (exeStmt)
 import TextList (deSerialise)
-import Data.Maybe (fromMaybe)
 import Database.Persist (ToBackendKey)
+import CardExpand (expand)
 
 
 type PresentationParams = Either DT.Text (Entity LearnDatum, XML.Document)
@@ -133,7 +133,8 @@ readFromSource :: Entity LearnDatum -> DT.Text -> DataDescriptor ->  LearningDat
 readFromSource item@(Entity _ (LearnDatum viewId _ _ _ _)) key (DataDescriptor cols keys1y handle) (LearningData.View _ _ obverse _) =
 	YC.liftIO $
 		readExternalDataSourceRecord key cols keys1y handle
-			>>= return . Just . Right . ((,) item) . documentHTML . DT.pack . extractField cols obverse
+			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
+			>>= return . Just . fmap (((,) item) . documentXHTML) . CardExpand.expand cols obverse
 
 
 readExternalDataSourceRecord :: DT.Text -> [DT.Text] -> [DT.Text] -> DataHandle -> IO [[Maybe String]]
@@ -142,11 +143,6 @@ readExternalDataSourceRecord key cols keys1y (Postgres conn table) = exeStmt con
 
 mkSqlWhereClause :: [DT.Text] -> String
 mkSqlWhereClause keysList = DL.concat $ DL.intersperse " AND " $ map (\key -> "(\"" ++ DT.unpack key ++ "\"=?)") keysList
-
-
-extractField :: [DT.Text] -> DT.Text -> [[Maybe String]] -> String
--- TODO handle 0 and multiple rows
-extractField cols template [list] = fromMaybe "<null field>" $ list !! 5
 
 
 -- put the necessary data into the session so that the POST knows what to add or update.
@@ -169,6 +165,10 @@ informationMessage message = YC.liftIO $ return $ BZH.toHtml $ documentHTML mess
 
 documentHTML :: DT.Text -> XML.Document
 documentHTML content = XML.Document standardPrologue (embed [XML.NodeContent content] okButton) []
+
+
+documentXHTML :: [XML.Node] -> XML.Document
+documentXHTML content = XML.Document standardPrologue (embed content okButton) []
 
 
 standardPrologue :: XML.Prologue
