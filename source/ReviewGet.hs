@@ -134,7 +134,7 @@ readFromSource item@(Entity _ (LearnDatum viewId _ _ _ _)) key (DataDescriptor c
 	YC.liftIO $
 		readExternalDataSourceRecord key cols keys1y handle
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
-			>>= return . Just . fmap (((,) item) . documentXHTML) . CardExpand.expand cols obverse
+			>>= return . Just . fmap (((,) item) . documentXHTML) . CardExpand.expand cols Nothing obverse
 
 
 readExternalDataSourceRecord :: DT.Text -> [DT.Text] -> [DT.Text] -> DataHandle -> IO [[Maybe String]]
