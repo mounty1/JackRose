@@ -38,6 +38,10 @@ import JRState (JRState(..))
 YC.mkYesodData "JRState" RouteData.routeData
 
 
+-- This seems to be needed for older compilers;  ghc 8.0.2 can use 'Foundation.Route JRState' directly
+type Destination = YC.Route JRState
+
+
 instance YA.YesodAuth JRState where
 	type AuthId JRState = YAA.Username
 	getAuthId = return . Just . YA.credsIdent

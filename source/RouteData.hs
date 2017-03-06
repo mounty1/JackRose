@@ -22,6 +22,7 @@ import qualified Yesod.Routes.TH.Types as YT
 routeData :: [YT.ResourceTree String]
 routeData = [YC.parseRoutes|
 	/ HomeR GET POST
+	/score ScoreR GET POST
 	/review/#Text ReviewR GET
 	/auth AuthR YA.Auth YA.getAuth
 	/account/#Text LoginR GET

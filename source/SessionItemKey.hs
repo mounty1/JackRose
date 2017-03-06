@@ -15,7 +15,7 @@ module SessionItemKey (set, get) where
 
 
 import Yesod.Core (MonadHandler)
-import Yesod.Core.Handler (setSession, lookupSession)
+import Yesod.Core.Handler (setSession, lookupSession, deleteSession)
 import qualified Data.Text as DT (Text, pack)
 import Database.Persist.Sql (fromSqlKey, toSqlKey, Key)
 import TextShow (showt)
@@ -31,12 +31,16 @@ itemKey = DT.pack "JR.item"
 type DatumType = Key LearnDatum
 
 
+-- | Set the key.
 set :: MonadHandler m => DatumType -> m ()
 set = setSession itemKey . showt . fromSqlKey
 
 
+-- | Get the key.
+-- The key is then removed from the session; it can only be gotten once.
+-- If it will be needed later, it must be re-set.
 get :: MonadHandler m => m (Maybe DatumType)
-get = fmap (\mT -> fmap toKey (mT >>= maybeIntValue)) (lookupSession itemKey)
+get = fmap (\mT -> fmap toKey (mT >>= maybeIntValue)) (lookupSession itemKey) >>= (>>) (deleteSession itemKey) . return
 
 
 toKey :: Int64 -> DatumType

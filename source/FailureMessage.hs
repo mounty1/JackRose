@@ -19,8 +19,9 @@ import qualified Data.Text as DT (Text)
 import qualified Foundation (Handler)
 import qualified JRState
 import Control.Monad.Logger (logErrorNS)
+import PresentHTML (toHTMLdoc, documentHTML)
 
 
 -- | show failure as a web page
 page :: DT.Text -> Foundation.Handler YC.Html
-page msg = YC.getYesod >>= \site -> JRState.runFilteredLoggingT site (logErrorNS "internal" msg) >> YC.defaultLayout [YC.whamlet|<H1>#{msg}|]
+page msg = YC.getYesod >>= \site -> JRState.runFilteredLoggingT site (logErrorNS "internal" msg) >> toHTMLdoc (documentHTML msg)

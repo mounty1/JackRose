@@ -30,6 +30,8 @@ module LearningData (migrateData,
 		newItem,
 		History(..),
 		Y.get,
+		Y.insert,
+		updateTimeStamp,
 		deleteItems,
 		allSourceKeys,
 		mkLearnDatum,
@@ -42,7 +44,7 @@ import qualified Data.Text as DT (Text)
 import Authorisation (UserId)
 import Data.Int (Int8)
 import Data.Time (UTCTime)
-import Database.Persist (selectList, (<.), (==.), (<-.), SelectOpt(LimitTo), deleteCascadeWhere)
+import Database.Persist (selectList, update, (=.), (<.), (==.), (<-.), SelectOpt(LimitTo), deleteCascadeWhere)
 import Database.Persist.Sql (SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
 import Database.Persist.Types (entityKey)
@@ -112,6 +114,10 @@ allSourceKeys dsId = map pickKey `fmap` (selectList [ DataRowDataSourceRowId ==.
 
 pickKey :: Y.Entity DataRow -> DT.Text
 pickKey (Y.Entity _ (DataRow key _ _)) = key
+
+
+updateTimeStamp :: forall (m :: * -> *). Y.MonadIO m => Y.Key LearnDatum -> UTCTime -> ReaderT SqlBackend m ()
+updateTimeStamp key time = update key [ LearnDatumNextReview =. time, LearnDatumActivity =. 2 ]
 
 
 mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Unique LearnDatum

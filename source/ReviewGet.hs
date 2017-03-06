@@ -86,20 +86,20 @@ getReviewR = onlyIfAuthorised . review . DL.filter (not . DT.null) . DT.split (=
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
 review deckPath {- e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod >>= zappo where
 		zappo site = (YC.liftIO $ JRState.getUserConfig site) >>=
-			maybe (PH.informationMessage $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath) . DM.lookup username
+			maybe (FailureMessage.page $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath) . DM.lookup username
 
 
 descendToDeckRoot :: JRState.JRState -> UserDeck.NewThrottle -> [DT.Text] -> (UserId, [UserDeck.UserDeckCpt]) -> Foundation.Handler YC.Html
 
 -- Still nodes to descend in requested sub-tree, but nowhere to go
-descendToDeckRoot _ _ _ (_, []) = PH.informationMessage "nowhere to go"
+descendToDeckRoot _ _ _ (_, []) = FailureMessage.page "nowhere to go"
 
 -- If XPath-like spec. is empty then 'stuff' is the requested sub-tree so pick an item to display.
 -- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
 -- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
 -- which is the daily (well, sliding 24 hour window) limit on new cards.
 descendToDeckRoot site throttle [] (userId, stuff : _) = searchForExistingByTable site userId flattenedDeck >>= maybe fallToNew rememberItem where
-		fallToNew = searchForNew site userId throttle flattenedDeck >>= maybe (PH.informationMessage "no more items") rememberItem
+		fallToNew = searchForNew site userId throttle flattenedDeck >>= maybe (FailureMessage.page "no more items") rememberItem
 		flattenedDeck = tableList stuff
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
@@ -161,7 +161,7 @@ readFromSource item key (DataDescriptor cols keys1y handle) (LearningData.View _
 -- put the necessary data into the session so that the POST knows what to add or update.
 -- TODO a Left indicates inconsistency in the data, so really we should log every one out and fix it.
 rememberItem :: PresentationParams -> Foundation.Handler YC.Html
-rememberItem (Left errCode) = PH.informationMessage errCode
+rememberItem (Left errCode) = FailureMessage.page errCode
 rememberItem (Right (Entity itemId _, document)) = SessionItemKey.set itemId >> PH.toHTMLdoc document
 
 

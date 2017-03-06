@@ -67,6 +67,7 @@ executable JackRose
                       ReviewPost
                       RouteData
                       ScoreGet
+                      ScorePost
                       SessionItemKey
                       SiteConfigFromFile
                       SplitList

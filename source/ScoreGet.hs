@@ -11,7 +11,7 @@ Portability: undefined
 {-# LANGUAGE OverloadedStrings, FlexibleContexts, RankNTypes #-}
 
 
-module ScoreGet (goScoreR) where
+module ScoreGet (getScoreR) where
 
 
 import qualified Yesod.Core as YC
@@ -28,10 +28,11 @@ import Database.Persist.Sql (fromSqlKey, Key, ToBackendKey, SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
 import GoHome (goHome)
 import qualified PresentHTML as PH
-import qualified SessionItemKey (get)
+import qualified SessionItemKey (get, set)
 import ConnectionSpec (DataDescriptor(..))
 import CardExpand (expand)
 import ExternalData (get)
+import LoginPlease (onlyIfAuthorised)
 
 
 type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) => ReaderT SqlBackend m XML.Document
@@ -40,12 +41,12 @@ type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) =>
 -- TODO Branding
 
 -- Process OK button;  first extract item id. from session data
-goScoreR :: DT.Text -> Foundation.Handler YC.Html
-goScoreR _ = SessionItemKey.get >>= maybe goHome showAnswer
+getScoreR :: Foundation.Handler YC.Html
+getScoreR = onlyIfAuthorised (const $ SessionItemKey.get >>= maybe goHome showAnswer)
 
 
 showAnswer :: Key LearnDatum -> Foundation.Handler YC.Html
-showAnswer itemId = YC.getYesod >>= showAnswer' itemId
+showAnswer itemId = SessionItemKey.set itemId >> YC.getYesod >>= showAnswer' itemId
 
 showAnswer' :: Key LearnDatum -> JRState.JRState -> Foundation.Handler YC.Html
 showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) >>= PH.toHTMLdoc where

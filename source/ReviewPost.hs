@@ -20,8 +20,6 @@ import qualified Yesod.Core as YC
 import qualified Foundation
 import Data.Text (Text)
 import LoginPlease (onlyIfAuthorised)
-import GoHome (goHome)
-import ScoreGet (goScoreR)
 
 
 -- | user has scored their item so re-schedule it and move to the next.
@@ -32,8 +30,7 @@ postHomeR = onlyIfAuthorised reveal
 -- http://lusku.de/blog/entry/1 for how to handle grade buttons
 -- | user has pressed a 'score' button; update database with new review and go to next item
 reveal :: Text -> Foundation.Handler YC.Html
-reveal username =
-	(Y.runInputPost $ triple <$> Y.iopt Y.textField "stats" <*> Y.iopt Y.textField "OK" <*> Y.iopt Y.textField "logout") >>= enaction username
+reveal _ = (Y.runInputPost $ triple <$> Y.iopt Y.textField "stats" <*> Y.iopt Y.textField "OK" <*> Y.iopt Y.textField "logout") >>= YC.redirect . enaction
 
 
 type OpText = Maybe Text
@@ -43,12 +40,12 @@ triple :: OpText -> OpText -> OpText -> (OpText, OpText, OpText)
 triple one two three = (one, two, three)
 
 
-enaction :: Text -> (OpText, OpText, OpText) -> Foundation.Handler YC.Html
+enaction :: (OpText, OpText, OpText) -> Foundation.Destination
 -- "stats" button pressed;  go to upload/download screen (not yet written)
-enaction _ (Just _, _, _) = goHome
+enaction (Just _, _, _) = Foundation.HomeR
 -- OK button pressed;  work out which one and score this item
-enaction username (Nothing, Just grade, _) = goScoreR username
+enaction (Nothing, Just _, _) = Foundation.ScoreR
 -- "logout" button pressed;  so do it.
-enaction _ (Nothing, Nothing, Just _) = YC.redirect (Foundation.AuthR YA.LogoutR)
+enaction (Nothing, Nothing, Just _) = Foundation.AuthR YA.LogoutR
 -- "this should never happen";  not sure what to do here.
-enaction _ (Nothing, Nothing, Nothing) = goHome
+enaction (Nothing, Nothing, Nothing) = Foundation.HomeR

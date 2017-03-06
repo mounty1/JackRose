@@ -27,15 +27,11 @@ toHTMLdoc :: XML.Document -> Foundation.Handler YC.Html
 toHTMLdoc = YC.liftIO . return . BZH.toHtml
 
 
-informationMessage :: DT.Text -> Foundation.Handler YC.Html
-informationMessage message = toHTMLdoc $ documentHTML message
-
-
 documentHTML :: DT.Text -> XML.Document
 documentHTML content = XML.Document standardPrologue (embed [XML.NodeContent content] okButton) []
 
 
-documentXHTML ::[XML.Node] ->  [XML.Node] -> XML.Document
+documentXHTML :: [XML.Node] ->  [XML.Node] -> XML.Document
 documentXHTML buttons content = XML.Document standardPrologue (embed content buttons) []
 
 

@@ -25,8 +25,10 @@ import qualified Yesod
 import qualified Yesod.Auth as YA
 import ReviewGet (getHomeR, getLoginR, getReviewR)
 import ReviewPost (postHomeR)
+import ScoreGet (getScoreR)
+import ScorePost (postScoreR)
 import Foundation
 import JRState (JRState)
- 
+
 
 Yesod.mkYesodDispatch "JRState" resourcesJRState
