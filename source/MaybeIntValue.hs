@@ -19,10 +19,10 @@ import qualified Data.Text.Read as DTR (decimal)
 
 
 -- | Represents an optional number in a configuration file.
-maybeIntValue :: DT.Text -> Maybe Int
+maybeIntValue :: Integral i => DT.Text -> Maybe i
 maybeIntValue = reduceIt . DTR.decimal
 
 
-reduceIt :: Either String (Int, DT.Text) -> Maybe Int
+reduceIt :: Integral i => Either String (i, DT.Text) -> Maybe i
 reduceIt (Right (n, "")) = Just n
 reduceIt _ = Nothing

@@ -23,11 +23,10 @@ module Application () where
 
 import qualified Yesod
 import qualified Yesod.Auth as YA
-import ReviewGet (getHomeR, getReviewR)
+import ReviewGet (getHomeR, getLoginR, getReviewR)
 import ReviewPost (postHomeR)
-import LoginPost (getLoginR, getLoginPostR)
 import Foundation
 import JRState (JRState)
-
+ 
 
 Yesod.mkYesodDispatch "JRState" resourcesJRState

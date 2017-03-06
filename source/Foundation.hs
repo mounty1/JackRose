@@ -41,7 +41,7 @@ YC.mkYesodData "JRState" RouteData.routeData
 instance YA.YesodAuth JRState where
 	type AuthId JRState = YAA.Username
 	getAuthId = return . Just . YA.credsIdent
-	loginDest _ = LoginPostR
+	loginDest _ = HomeR
 	logoutDest _ = AuthR YA.LoginR
 	authPlugins _ = [YAA.accountPlugin]
 	authHttpManager _ = error "No manager needed"
@@ -77,5 +77,5 @@ emailEnaction action uname email url = YC.getYesod >>= enact where
 
 
 instance YAA.AccountSendEmail JRState where
-	sendVerifyEmail uname email url = emailEnaction EmailVerification.newAccountEmail uname email url
-	sendNewPasswordEmail uname email url = emailEnaction EmailVerification.resetAccountEmail uname email url
+	sendVerifyEmail = emailEnaction EmailVerification.newAccountEmail
+	sendNewPasswordEmail = emailEnaction EmailVerification.resetAccountEmail

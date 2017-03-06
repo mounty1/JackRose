@@ -150,7 +150,7 @@ connection :: JRState.JRState -> [DT.Text] -> IO (Either DT.Text OpenDataSource)
 connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername, maybePassword ] = catch (connectPostgreSQL connString >>= pullStructure) sourceFail where
 
 	connString = "host=" ++ DT.unpack serverIP
-		++ maybe "" (makeLabel "port") (maybeIntValue maybePort)
+		++ maybe "" (makeLabel "port") (maybeIntValue maybePort :: Maybe Int)
 		++ (if DT.null maybeDBase then "" else makeLabel "dbname" (DT.unpack maybeDBase))
 		++ " user=" ++ (DT.unpack $ if DT.null maybeUsername then JRState.databaseUser site else maybeUsername)
 		++ (if DT.null maybePassword then "" else makeLabel "password" (DT.unpack maybePassword))

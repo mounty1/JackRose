@@ -51,6 +51,7 @@ executable JackRose
                       DataSource
                       EmailVerification
                       ExecuteSqlStmt
+                      ExternalData
                       FailureMessage
                       Foundation
                       GoHome
@@ -59,12 +60,14 @@ executable JackRose
                       LearningResync
                       LogFilter
                       LoginPlease
-                      LoginPost
                       MaybeIntValue
                       Persistency
+                      PresentHTML
                       ReviewGet
                       ReviewPost
                       RouteData
+                      ScoreGet
+                      SessionItemKey
                       SiteConfigFromFile
                       SplitList
                       TextList

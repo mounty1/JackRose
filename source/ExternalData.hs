@@ -1,0 +1,26 @@
+{-|
+Description: Compose and execute a SQL statement.
+Copyright: (c) Michael Mounteney, 2017
+License: BSD 3 clause
+Maintainer: the project name, all lower case, at landcroft dot com
+Stability: experimental
+Portability: undefined
+-}
+
+module ExternalData (get) where
+
+
+import qualified Data.List as DL (intersperse, concat)
+import TextList (deSerialise)
+import ExecuteSqlStmt (exeStmt)
+import ConnectionSpec (DataHandle(..))
+import qualified Data.Text as DT (Text, unpack)
+
+
+get :: DT.Text -> [DT.Text] -> DataHandle -> IO [[Maybe String]]
+get key keys1y (Postgres conn table) = exeStmt conn ("SELECT * FROM \"" ++ DT.unpack table ++ "\" WHERE " ++ mkSqlWhereClause keys1y ++ ";") (map DT.unpack $ deSerialise key)
+
+
+mkSqlWhereClause :: [DT.Text] -> String
+mkSqlWhereClause keysList = DL.concat $ DL.intersperse " AND " $ map (\key -> "(\"" ++ DT.unpack key ++ "\"=?)") keysList
+
