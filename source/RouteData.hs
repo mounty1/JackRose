@@ -23,6 +23,7 @@ routeData :: [YT.ResourceTree String]
 routeData = [YC.parseRoutes|
 	/ HomeR GET POST
 	/score ScoreR GET POST
+	/notice/#Text NoticeR GET POST
 	/review/#Text ReviewR GET
 	/auth AuthR YA.Auth YA.getAuth
 	|]

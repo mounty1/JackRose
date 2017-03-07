@@ -16,12 +16,13 @@ module FailureMessage (page) where
 
 import qualified Yesod.Core as YC
 import qualified Data.Text as DT (Text)
-import qualified Foundation (Handler)
+import qualified Foundation
 import qualified JRState
 import Control.Monad.Logger (logErrorNS)
-import PresentHTML (toHTMLdoc, documentHTML)
 
 
--- | show failure as a web page
+-- | Show failure as a web page.
+-- Just log the error then redirect to the Notice page.
+-- This isn't a route because we don't want unauthorised users to log messages.
 page :: DT.Text -> Foundation.Handler YC.Html
-page msg = YC.getYesod >>= \site -> JRState.runFilteredLoggingT site (logErrorNS "internal" msg) >> toHTMLdoc (documentHTML msg)
+page msg = YC.getYesod >>= \site -> JRState.runFilteredLoggingT site (logErrorNS "internal" msg) >> (YC.redirect $ Foundation.NoticeR msg)

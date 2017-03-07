@@ -27,6 +27,7 @@ import ReviewGet (getHomeR, getReviewR)
 import ReviewPost (postHomeR)
 import ScoreGet (getScoreR)
 import ScorePost (postScoreR)
+import Notice (getNoticeR, postNoticeR)
 import Foundation
 import JRState (JRState)
 

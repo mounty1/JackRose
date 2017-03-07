@@ -61,6 +61,7 @@ executable JackRose
                       LogFilter
                       LoginPlease
                       MaybeIntValue
+                      Notice,
                       Persistency
                       PresentHTML
                       ReviewGet

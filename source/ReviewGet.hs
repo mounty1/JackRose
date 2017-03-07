@@ -15,7 +15,7 @@ module ReviewGet (getHomeR, getReviewR) where
 
 
 import qualified Yesod.Core as YC
-import qualified Foundation (Handler)
+import qualified Foundation
 import qualified FailureMessage (page)
 import qualified Data.Text as DT (Text, split, concat, null, pack)
 import qualified Text.XML as XML (Document)
@@ -99,7 +99,7 @@ descendToDeckRoot _ _ _ (_, []) = FailureMessage.page "nowhere to go"
 -- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
 -- which is the daily (well, sliding 24 hour window) limit on new cards.
 descendToDeckRoot site throttle [] (userId, stuff : _) = searchForExistingByTable site userId flattenedDeck >>= maybe fallToNew rememberItem where
-		fallToNew = searchForNew site userId throttle flattenedDeck >>= maybe (FailureMessage.page "no more items") rememberItem
+		fallToNew = searchForNew site userId throttle flattenedDeck >>= maybe (YC.redirect $ Foundation.NoticeR "No more reviews due") rememberItem
 		flattenedDeck = tableList stuff
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
