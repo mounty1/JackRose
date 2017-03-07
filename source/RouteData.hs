@@ -25,5 +25,4 @@ routeData = [YC.parseRoutes|
 	/score ScoreR GET POST
 	/review/#Text ReviewR GET
 	/auth AuthR YA.Auth YA.getAuth
-	/account/#Text LoginR GET
 	|]

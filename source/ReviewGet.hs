@@ -11,7 +11,7 @@ Portability: undefined
 {-# LANGUAGE OverloadedStrings, FlexibleContexts, RankNTypes, KindSignatures #-}
 
 
-module ReviewGet (getHomeR, getLoginR, getReviewR) where
+module ReviewGet (getHomeR, getReviewR) where
 
 
 import qualified Yesod.Core as YC
