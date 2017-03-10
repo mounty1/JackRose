@@ -64,3 +64,15 @@ extra-package-dbs: []
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+
+build:
+  # NOTE: global usage of haddock can cause build failures when documentation is
+  # incorrectly formatted.  This could also affect scripts which use stack.
+  haddock: true
+  haddock-arguments:
+    haddock-args: ["--executables", "--builddir=../site/documentation"]
+    # haddock-args:
+    # - "--css=/home/user/my-css"
+  open-haddocks: false    # --open
+  haddock-deps: false     # if unspecified, defaults to true if haddock is set
+  haddock-internal: false

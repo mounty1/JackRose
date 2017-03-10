@@ -75,3 +75,27 @@ executable JackRose
                       TextList
                       UserDeck
                       UserToId
+
+executable AnkiConvert
+  main-is:            AnkiConvert.hs
+  default-language:   Haskell2010
+  ghc-options:        -O2 -Wall -threaded -fno-warn-tabs
+  build-depends:      base,
+                      yesod,
+                      yesod-auth-account,
+                      bytestring,
+                      text,
+                      persistent,
+                      transformers,
+                      persistent,
+                      persistent-sqlite,
+                      monad-control,
+                      monad-logger,
+                      HDBC,
+                      text-show,
+                      ConfigFile,
+                      mtl,
+                      HDBC-postgresql,
+                      containers,
+                      stm,
+                      time
