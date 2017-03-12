@@ -15,8 +15,7 @@ module EmailVerification (newAccountEmail, resetAccountEmail) where
 
 
 import qualified Yesod.Core as YC
-import qualified Data.Text as DT (Text, pack, concat)
-import qualified Network.Mail.SMTP as SMTP
+import qualified Data.Text as DT (Text, concat)
 import qualified Network.Mail.Mime as Mime
 import qualified Data.Text.Lazy as DTL
 import Control.Monad.Logger (logInfoN)
@@ -30,22 +29,19 @@ resetAccountEmail = emailAction "Reset password"
 
 
 emailAction :: (YC.MonadLogger m, YC.MonadIO m) => DT.Text -> DT.Text -> DT.Text -> DT.Text -> m ()
-emailAction text uname email url = do
-	YC.liftIO $ SMTP.sendMail "localhost" (makeEmail uname email url)
-	logAccountEmail uname email url text
+emailAction text uname email url = YC.liftIO (Mime.renderSendMail $ makeEmail uname email url) >> logAccountEmail uname email url text
 
 
 logAccountEmail :: YC.MonadLogger m => DT.Text -> DT.Text -> DT.Text -> DT.Text -> m ()
-logAccountEmail uname email url action =
-	logInfoN $ DT.concat [ action, DT.pack " email for ", uname, DT.pack " (", email, DT.pack "): ", url ]
+logAccountEmail uname email url action = logInfoN $ DT.concat [ action, " email for ", uname, " (", email, "): ", url ]
 
 
--- | http://nginx.com/resources/admin-guide/reverse-proxy/ section "Passing Request Headers" for more details
--- | we need this to get the external URL of the service.
+-- | http://nginx.com/resources/admin-guide/reverse-proxy/ section "Passing Request Headers" for more details;
+-- we need this to get the external URL of the service.
 makeEmail :: DT.Text -> DT.Text -> DT.Text -> Mime.Mail
 makeEmail uname email url =
 	Mime.simpleMail'
-		( Mime.Address (Just uname) email )
-		( Mime.Address (Just $ DT.pack "JackRose Verification") (DT.pack "root@localhost") )
-		( DT.pack "JackRose Account" )
-		( DTL.concat [ DTL.pack "Your URL is ", DTL.fromChunks [ url ] ] )
+		(Mime.Address (Just uname) email)
+		(Mime.Address (Just "JackRose Verification") ("root@localhost"))
+		"JackRose Account"
+		(DTL.concat [ "Your URL is ", DTL.fromChunks [ url ] ])
