@@ -99,3 +99,21 @@ executable AnkiConvert
                       containers,
                       stm,
                       time
+  other-modules:
+                      AnkiSchema,
+                      AuthoriStyle,
+                      Authorisation,
+                      CommandArgs,
+                      ConnectionSpec,
+                      DeckData,
+                      ExecuteSqlStmt,
+                      JRState,
+                      LearningData,
+                      LearningResync,
+                      LogFilter,
+                      MaybeIntValue,
+                      Persistency,
+                      SiteConfigFromFile,
+                      SplitList,
+                      TextList,
+                      UserDeck

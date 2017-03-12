@@ -23,7 +23,7 @@ import qualified Control.Monad.Trans.Reader (ReaderT)
 import Database.Persist.Types (entityKey)
 
 
-Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistLowerCase|
+Y.share [Y.mkPersist Y.sqlSettings, Y.mkMigrate "migrateData"] [Y.persistUpperCase|
 User
 	username DT.Text NOT NULL
 	password DB.ByteString

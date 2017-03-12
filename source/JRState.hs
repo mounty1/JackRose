@@ -22,8 +22,12 @@ import Control.Concurrent.STM.TVar (readTVarIO)
 import Control.Monad.Logger (LoggingT, LogLevel)
 import Control.Monad.IO.Class (MonadIO)
 import LogFilter (runFilteredLoggingT)
-import ConnectionSpec (DataDescriptor)
+import ConnectionSpec (DataDescriptor, PostgresConnection)
 import LearningData (DataSourceId)
+import Database.HDBC.PostgreSQL (Connection)
+
+
+type PostgresConnPool = Map PostgresConnection (Int, Connection)
 
 
 type DataSchemes = Map DataSourceId DataDescriptor
@@ -59,15 +63,21 @@ data JRState = JRState {
 			-- ^ needed for identification emails
 		howAuthorised :: Style,
 			-- ^ not sure and makes no sense now
+		postgresConnections :: TVar PostgresConnPool,
+			-- ^ all tables in a given database share a common PG ConnectionPool
 		dataSchemes :: TVar DataSchemes,
-			-- ^ filled-in by a later step in the initialisation process
+			-- ^ 'live' LearningData.DataSource with opened connections
 		userConfig :: TVar UserConfig
-			-- ^ filled-in by a later step in the initialisation process
+			-- ^ one per logged-in user
 	}
 
 
 runFilteredLoggingT :: MonadIO m => JRState -> LoggingT m a -> m a
 runFilteredLoggingT site = LogFilter.runFilteredLoggingT (logLevel site)
+
+
+getPostgresConnPool :: JRState -> IO PostgresConnPool
+getPostgresConnPool = readTVarIO . postgresConnections
 
 
 getDataSchemes :: JRState -> IO DataSchemes

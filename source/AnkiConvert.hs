@@ -35,8 +35,7 @@ import Control.Monad.Logger (LogLevel(..))
 main :: IO ()
 -- | Turn the command line arguments into an easily-queried object,
 -- use that to inform the construction of the foundation siteObject,
--- perform any required data migrations,
--- and hand over to Warp, to launch the service.
+-- then invoke the conversion.
 main = CommandArgs.args >>= siteObject >>= letsGo
 
 
@@ -44,5 +43,9 @@ letsGo :: JRState.JRState -> IO ()
 letsGo site =
 	mapM_ (Persistency.upgradeDB (JRState.tablesFile site)) [Authorisation.migrateData, LearningData.migrateData, DeckData.migrateData]
 	>> LearningResync.update site
-	>> (runFilteredLoggingT LevelInfo (PerstQ.createSqlitePool "anki.sqlite" 1) :: IO (PerstQ.ConnectionPool))
-	>> putStrLn "incomplete"
+	>> runFilteredLoggingT LevelInfo (PerstQ.createSqlitePool "anki.sqlite" 1)
+	>>= copyConvertAnki site
+
+
+copyConvertAnki :: JRState.JRState -> PerstQ.ConnectionPool -> IO ()
+copyConvertAnki site sourceAnki = putStrLn "incomplete"

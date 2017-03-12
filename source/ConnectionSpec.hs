@@ -26,3 +26,12 @@ data DataHandle
 	= Postgres Connection Text
 	| Sqlite3 { tableName :: Text }
 	| ExternalCached
+
+
+data PostgresConnection = PostgresConnection {
+	serverName :: Text,
+	maybePort :: Maybe Int,
+	maybeDBName :: Maybe Text,
+	userName :: Text,
+	maybePassword :: Maybe Text
+} deriving (Eq, Ord)

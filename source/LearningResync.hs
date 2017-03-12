@@ -22,9 +22,9 @@ import Data.Time (getCurrentTime, UTCTime)
 import Control.Exception (catch)
 import Data.List (foldl', intersperse, (\\))
 import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable)
-import qualified Data.Map as DM (insert)
+import qualified Data.Map as DM (insert, adjust, lookup)
 import qualified Data.Text as DT (Text, concat, pack, unpack, null)
-import qualified JRState (JRState(..), runFilteredLoggingT)
+import qualified JRState (JRState(..), getPostgresConnPool, runFilteredLoggingT)
 import Database.Persist.Sql (Entity(Entity), Key, fromSqlKey)
 import Database.Persist.Sqlite (runSqlPool, selectList)
 import Database.Persist (replace)
@@ -37,7 +37,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Logger (LoggingT, logInfoNS, logWarnNS, logErrorNS)
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar (modifyTVar')
-import ConnectionSpec (DataDescriptor(..), DataHandle(..))
+import ConnectionSpec (DataDescriptor(..), DataHandle(..), PostgresConnection(..))
 import MaybeIntValue (maybeIntValue)
 import TextList (deSerialise)
 import DeckData (userDeckEndsViewed, userDeckEndViewId, UserDeckEnd)
@@ -46,6 +46,7 @@ import Control.Monad.Trans.Reader (ReaderT)
 import Database.Persist.Sql (SqlBackend)
 import TextShow (showt)
 import ExecuteSqlStmt (exeStmt)
+import Data.Bifunctor (first)
 
 
 -- | Create handles or connections to all data sources;
@@ -145,15 +146,36 @@ data OpenDataSource = OpenDataSource DataHandle [DT.Text] [DT.Text] [DT.Text]
 
 
 -- Given a data-source code, open it and return the required parameters.
+-- Since data-sources are given in terms of a database connection and a table, it is quite likely that
+-- several connections will share one connection.  So this function either re-uses the existing
+-- connection (and increases its reference count) or adds a new connection to the JRState pool.
 connection :: JRState.JRState -> [DT.Text] -> IO (Either DT.Text OpenDataSource)
 
-connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername, maybePassword ] = catch (connectPostgreSQL connString >>= pullStructure) sourceFail where
+connection site [ "P", serverIP, maybePortNo, maybeDBase, dataTable, maybeUsername, maybePassw ] = catch (JRState.getPostgresConnPool site
+			>>= maybe (connectPostgreSQL connString >>= newConn) reuseConn . DM.lookup connectionParms
+			>>= pullStructure) sourceFail where
 
-	connString = "host=" ++ DT.unpack serverIP
-		++ maybe "" (makeLabel "port") (maybeIntValue maybePort :: Maybe Int)
-		++ (if DT.null maybeDBase then "" else makeLabel "dbname" (DT.unpack maybeDBase))
-		++ " user=" ++ (DT.unpack $ if DT.null maybeUsername then JRState.databaseUser site else maybeUsername)
-		++ (if DT.null maybePassword then "" else makeLabel "password" (DT.unpack maybePassword))
+	connString = "host=" ++ DT.unpack svr
+		++ maybe "" (makeLabel "port") (fmap (DT.pack . show) mbP)
+		++ maybe "" (makeLabel "dbname") mbD
+		++ " user=" ++ DT.unpack uName
+		++ maybe "" (makeLabel "password") mbW
+
+	connectionParms@(PostgresConnection svr mbP mbD uName mbW) = PostgresConnection
+			serverIP
+			(maybeIntValue maybePortNo)
+			(if DT.null maybeDBase then Nothing else Just maybeDBase)
+			(if DT.null maybeUsername then JRState.databaseUser site else maybeUsername)
+			(if DT.null maybePassw then Nothing else Just maybePassw)
+
+	-- This database connection doesn't exist yet in the pool so add it.
+	newConn conn = produceConn conn (DM.insert connectionParms (1, conn))
+
+	-- This database connection does exist so merely increment its reference count.
+	reuseConn (_, conn) = produceConn conn (DM.adjust (first (1 +)) connectionParms)
+
+	-- Workhorse for the newConn and reuseConn
+	produceConn conn fn = atomically (modifyTVar' (JRState.postgresConnections site) fn) >> return conn
 
 	pullStructure conn = HDBC.describeTable conn tableNameStr >>= mashIntoFields conn
 
@@ -161,7 +183,7 @@ connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername
 		>>= return . maybe [] (map DT.pack) . sequence . map head
 		>>= kazam conn rows
 
-	kazam conn rows primaryKey = exeStmt conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" order by " ++ keysList ++ ";") []
+	kazam conn rows primaryKey = exeStmt conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" ORDER BY " ++ keysList ++ ";") []
 		-- extract primary key value from row as [[Maybe String]] and convert to [DataRow]
 		-- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
 		>>= return . map (enSerialise . map DT.pack) . catMaybes . map sequence
@@ -171,7 +193,6 @@ connection site [ "P", serverIP, maybePort, maybeDBase, dataTable, maybeUsername
 	primyKeyQuery = "SELECT \"attname\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass AND i.indisprimary ORDER BY a.attnum;"
 
 	tableNameStr = DT.unpack dataTable
-
 
 connection _site [ "Q", _dtableName ] = return $ Left "SQLite not implemented yet"
 
@@ -186,8 +207,8 @@ sourceFail :: HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
 sourceFail = return . Left . DT.pack . show
 
 
-makeLabel :: Show a => String -> a -> String
-makeLabel label value = " " ++ label ++ "=\"" ++ show value ++ "\""
+makeLabel :: String -> DT.Text -> String
+makeLabel label value = " " ++ label ++ "=\"" ++ DT.unpack value ++ "\""
 
 
 -- comma-separated list of primary key fieldsKey
