@@ -36,7 +36,8 @@ module LearningData (migrateData,
 		allSourceKeys,
 		mkLearnDatum,
 		mkLearnDatumKey,
-		viewsOnDataSource) where
+		viewsOnDataSource,
+		lastHistory) where
 
 
 import qualified Yesod as Y
@@ -44,10 +45,10 @@ import qualified Data.Text as DT (Text)
 import Authorisation (UserId)
 import Data.Int (Int8)
 import Data.Time (UTCTime)
-import Database.Persist (selectList, update, (=.), (<.), (==.), (<-.), SelectOpt(LimitTo), deleteCascadeWhere)
+import Database.Persist (selectList, update, (=.), (<.), (==.), (<-.), SelectOpt(LimitTo, Desc), deleteCascadeWhere)
 import Database.Persist.Sql (SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
-import Database.Persist.Types (entityKey)
+import Database.Persist.Types (entityKey, entityVal)
 import SplitList (split)
 import Data.Maybe (listToMaybe)
 
@@ -136,3 +137,7 @@ deleteItems deletees = sequence $ map (\portion -> deleteCascadeWhere [DataRowTa
 -- | return list of views that refer to the given data source
 viewsOnDataSource :: Y.Key DataSource -> PersistResult [Y.Key View]
 viewsOnDataSource sourceId = map entityKey `fmap` selectList [ ViewDataSourceId ==. sourceId ] []
+
+
+lastHistory :: (Y.PersistQueryRead SqlBackend) => Int -> Y.Key LearnDatum ->PersistResult [History]
+lastHistory limit item = map entityVal `fmap` selectList [ HistoryItem ==. item ] [ Desc HistoryStamp, LimitTo limit ]
