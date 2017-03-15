@@ -21,11 +21,12 @@ import qualified Foundation
 import Data.Text (Text)
 import qualified PresentHTML as PH
 import LoginPlease (onlyIfAuthorised)
+import qualified Branding (visibleName)
 
 
 -- | Display a simple message.
 getNoticeR :: Text -> Foundation.Handler YC.Html
-getNoticeR = PH.toHTMLdoc . PH.documentHTML
+getNoticeR = PH.toHTMLdoc . PH.documentHTML Branding.visibleName
 
 
 -- | Respond to button-press from displayed message.

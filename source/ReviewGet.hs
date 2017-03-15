@@ -20,7 +20,7 @@ import qualified FailureMessage (page)
 import qualified Data.Text as DT (Text, split, concat, null, pack)
 import qualified Text.XML as XML (Document)
 import qualified Data.Map as DM
-import qualified Data.List as DL (filter)
+import qualified Data.List as DL (filter, intersperse)
 import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, userConfig, getUserConfig, getDataSchemes, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
@@ -63,7 +63,7 @@ getLoginR acctName = YC.getYesod >>= checkAlreadyLoggedIn acctName
 
 
 checkAlreadyLoggedIn :: DT.Text  -> JRState.JRState -> Foundation.Handler YC.Html
-checkAlreadyLoggedIn acctName site = YC.liftIO (JRState.getUserConfig site) >>= maybe (verifyUser acctName site) (descendToDeckRoot site Nothing []) . DM.lookup acctName
+checkAlreadyLoggedIn acctName site = YC.liftIO (JRState.getUserConfig site) >>= maybe (verifyUser acctName site) (descendToDeckRoot site Nothing [] []) . DM.lookup acctName
 
 
 verifyUser :: DT.Text -> JRState.JRState -> Foundation.Handler YC.Html
@@ -86,37 +86,37 @@ getReviewR = onlyIfAuthorised . review . DL.filter (not . DT.null) . DT.split (=
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
 review deckPath {- e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod >>= zappo where
 		zappo site = (YC.liftIO $ JRState.getUserConfig site) >>=
-			maybe (FailureMessage.page $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath) . DM.lookup username
+			maybe (FailureMessage.page $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath []) . DM.lookup username
 
 
-descendToDeckRoot :: JRState.JRState -> UserDeck.NewThrottle -> [DT.Text] -> (UserId, [UserDeck.UserDeckCpt]) -> Foundation.Handler YC.Html
+descendToDeckRoot :: JRState.JRState -> UserDeck.NewThrottle -> [DT.Text] -> [DT.Text] -> (UserId, [UserDeck.UserDeckCpt]) -> Foundation.Handler YC.Html
 
 -- Still nodes to descend in requested sub-tree, but nowhere to go
-descendToDeckRoot _ _ _ (_, []) = FailureMessage.page "nowhere to go"
+descendToDeckRoot _ _ _ _ (_, []) = FailureMessage.page "nowhere to go"
 
 -- If XPath-like spec. is empty then 'stuff' is the requested sub-tree so pick an item to display.
 -- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
 -- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
 -- which is the daily (well, sliding 24 hour window) limit on new cards.
-descendToDeckRoot site throttle [] (userId, stuff : _) = searchForExistingByTable site userId flattenedDeck >>= maybe fallToNew rememberItem where
-		fallToNew = searchForNew site userId throttle flattenedDeck >>= maybe (YC.redirect $ Foundation.NoticeR "No more reviews due") rememberItem
+descendToDeckRoot site throttle [] deckDrilled (userId, stuff : _) = searchForExistingByTable site userId flattenedDeck deckDrilled >>= maybe fallToNew rememberItem where
+		fallToNew = searchForNew site userId throttle flattenedDeck deckDrilled >>= maybe (YC.redirect $ Foundation.NoticeR "No more reviews due") rememberItem
 		flattenedDeck = tableList stuff
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
-descendToDeckRoot site throttle deckPath@(d1 : dn) (userId, UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
-	if d1 == label then descendToDeckRoot site newThrottle dn (userId, item) else descendToDeckRoot site throttle deckPath (userId, rest) where
+descendToDeckRoot site throttle deckPath@(d1 : dn) deckDrilled (userId, UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
+	if d1 == label then descendToDeckRoot site newThrottle dn (d1 : deckDrilled) (userId, item) else descendToDeckRoot site throttle deckPath deckDrilled (userId, rest) where
 		newThrottle = mergeThrottle throttle maybeThrottle
 
 -- no match so try next peer
-descendToDeckRoot site throttle deckPath (userId, _ : rest) = descendToDeckRoot site throttle deckPath (userId, rest)
+descendToDeckRoot site throttle deckPath deckDrilled (userId, _ : rest) = descendToDeckRoot site throttle deckPath deckDrilled (userId, rest)
 
 
 -- TODO document
-searchForExistingByTable :: JRState.JRState -> UserId -> [ViewId] -> Foundation.Handler (Maybe PresentationParams)
+searchForExistingByTable :: JRState.JRState -> UserId -> [ViewId] -> [DT.Text] -> Foundation.Handler (Maybe PresentationParams)
 
 -- descended to a terminal node (a TableView) so get the next card from it
-searchForExistingByTable site userId views =YC.liftIO $ getCurrentTime >>= showCardItem where
-	showCardItem now = runItemQuery site (dueItem userId now views)
+searchForExistingByTable site userId views deckDrilled =YC.liftIO $ getCurrentTime >>= showCardItem where
+	showCardItem now = runItemQuery site (dueItem userId now views) deckDrilled
 
 
 tableList :: UserDeck.UserDeckCpt -> [ViewId]
@@ -124,12 +124,12 @@ tableList (UserDeck.TableView _ _ vid) = [vid]
 tableList (UserDeck.SubDeck _ _ _ dex) = concatMap tableList dex
 
 
-searchForNew ::JRState.JRState -> UserId -> UserDeck.NewThrottle -> [ViewId] -> Foundation.Handler (Maybe PresentationParams)
-searchForNew site userId throttle views = runItemQuery site (newItem userId views)
+searchForNew ::JRState.JRState -> UserId -> UserDeck.NewThrottle -> [ViewId] -> [DT.Text] -> Foundation.Handler (Maybe PresentationParams)
+searchForNew site userId throttle views deckDrilled = runItemQuery site (newItem userId views) deckDrilled
 
 
-runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> SqlPersistT (LoggingT m) (Maybe (Entity LearnDatum)) -> m (Maybe PresentationParams)
-runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) where
+runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> SqlPersistT (LoggingT m) (Maybe (Entity LearnDatum)) -> [DT.Text] -> m (Maybe PresentationParams)
+runItemQuery site fn deckDrilled = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) where
 
 	fn2 = fn >>= maybe (return Nothing) getItemAndViewIds
 
@@ -143,19 +143,19 @@ runItemQuery site fn = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState
 
 	readFromView :: Entity LearnDatum -> DT.Text -> DataDescriptor -> LearnItemParameters
 	readFromView item@(Entity _ (LearnDatum viewId _ _ _ _)) key descriptor = LearningData.get viewId
-			>>= maybe (noSomething "view" viewId) (readFromSource item key descriptor)
+			>>= maybe (noSomething "view" viewId) (readFromSource item key deckDrilled descriptor)
 
 
 noSomething :: (ToBackendKey SqlBackend record) => DT.Text -> Key record -> LearnItemParameters
 noSomething label item = YC.liftIO $ return $ Just $ Left $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
 
 
-readFromSource :: Entity LearnDatum -> DT.Text -> DataDescriptor ->  LearningData.View -> LearnItemParameters
-readFromSource item key (DataDescriptor cols keys1y handle) (LearningData.View _ _ obverse _) =
+readFromSource :: Entity LearnDatum -> DT.Text -> [DT.Text] -> DataDescriptor ->  LearningData.View -> LearnItemParameters
+readFromSource item key deckDrilled (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse _) =
 	YC.liftIO $
 		ExternalData.get key keys1y handle
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
-			>>= return . Just . fmap (((,) item) . PH.documentXHTML PH.okButton) . CardExpand.expand cols Nothing obverse
+			>>= return . Just . fmap (((,) item) . PH.documentXHTML (DT.concat $ DL.intersperse "/" (if null deckDrilled then [] else reverse deckDrilled ++ [":"]) ++ [viewName]) PH.okButton) . CardExpand.expand cols Nothing obverse
 
 
 -- put the necessary data into the session so that the POST knows what to add or update.

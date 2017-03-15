@@ -27,24 +27,24 @@ toHTMLdoc :: XML.Document -> Foundation.Handler YC.Html
 toHTMLdoc = YC.liftIO . return . BZH.toHtml
 
 
-documentHTML :: DT.Text -> XML.Document
-documentHTML content = XML.Document standardPrologue (embed [XML.NodeContent content] okButton) []
+documentHTML :: DT.Text -> DT.Text -> XML.Document
+documentHTML title content = documentXHTML title [XML.NodeContent content] okButton
 
 
-documentXHTML :: [XML.Node] ->  [XML.Node] -> XML.Document
-documentXHTML buttons content = XML.Document standardPrologue (embed content buttons) []
+documentXHTML :: DT.Text -> [XML.Node] ->  [XML.Node] -> XML.Document
+documentXHTML title buttons content = XML.Document standardPrologue (embed title content buttons) []
 
 
 standardPrologue :: XML.Prologue
 standardPrologue =
 	XML.Prologue
 		[XML.MiscInstruction (XML.Instruction "xml" "version=\"1.0\" encoding=\"UTF-8\"")]
-		(Just (XML.Doctype "html" Nothing))
+		(Just $ XML.Doctype "html" Nothing)
 		[]
 
 
-embed :: [XML.Node] -> [XML.Node] -> XML.Element
-embed content nextButton =
+embed ::DT.Text -> [XML.Node] -> [XML.Node] -> XML.Element
+embed title content nextButton =
 	XML.Element
 		(nameXML "html")
 		DM.empty
@@ -54,7 +54,7 @@ embed content nextButton =
 				[makeAttribute "http-equiv" "Content-Type",
 					makeAttribute "content" "application/xhtml+xml;charset=utf-8"]
 				[],
-			makeNode "title" [] [XML.NodeContent "Greek / Grammar-"],
+			makeNode "title" [] [XML.NodeContent title],
 			makeNode "style" [] [XML.NodeContent ceeSS]
 			],
 		makeNode "body"

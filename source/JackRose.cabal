@@ -43,6 +43,7 @@ executable JackRose
   other-modules:      Application
                       AuthoriStyle
                       Authorisation
+                      Branding
                       CardExpand
                       CommandArgs
                       ConnectionSpec
@@ -100,20 +101,21 @@ executable AnkiConvert
                       stm,
                       time
   other-modules:
-                      AnkiSchema,
-                      AuthoriStyle,
-                      Authorisation,
-                      CommandArgs,
-                      ConnectionSpec,
-                      DeckData,
-                      ExecuteSqlStmt,
-                      JRState,
-                      LearningData,
-                      LearningResync,
-                      LogFilter,
-                      MaybeIntValue,
-                      Persistency,
-                      SiteConfigFromFile,
-                      SplitList,
-                      TextList,
+                      AnkiSchema
+                      AuthoriStyle
+                      Authorisation
+                      Branding
+                      CommandArgs
+                      ConnectionSpec
+                      DeckData
+                      ExecuteSqlStmt
+                      JRState
+                      LearningData
+                      LearningResync
+                      LogFilter
+                      MaybeIntValue
+                      Persistency
+                      SiteConfigFromFile
+                      SplitList
+                      TextList
                       UserDeck

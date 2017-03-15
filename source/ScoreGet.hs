@@ -67,7 +67,7 @@ showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRSt
 
 
 noSomething :: (ToBackendKey SqlBackend record) => DT.Text -> Key record -> LearnItemParameters
-noSomething label item = return $ PH.documentHTML $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
+noSomething label item = return $ PH.documentHTML "view category" $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
 
 
 readFromSource :: DT.Text -> DataDescriptor ->  LearningData.View -> LearnItemParameters
@@ -75,4 +75,4 @@ readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View _ _ ob
 	YC.liftIO $
 		ExternalData.get key keys1y handle
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
-			>>= return . either PH.documentHTML (PH.documentXHTML PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze
+			>>= return . either (PH.documentHTML "view category") (PH.documentXHTML "view category" PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze

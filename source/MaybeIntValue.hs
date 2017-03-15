@@ -23,6 +23,6 @@ maybeIntValue :: Integral i => DT.Text -> Maybe i
 maybeIntValue = reduceIt . DTR.decimal
 
 
-reduceIt :: Integral i => Either String (i, DT.Text) -> Maybe i
+reduceIt :: Either String (i, DT.Text) -> Maybe i
 reduceIt (Right (n, "")) = Just n
 reduceIt _ = Nothing

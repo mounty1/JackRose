@@ -15,10 +15,11 @@ module EmailVerification (newAccountEmail, resetAccountEmail) where
 
 
 import qualified Yesod.Core as YC
-import qualified Data.Text as DT (Text, concat)
+import qualified Data.Text as DT (Text, append, concat)
 import qualified Network.Mail.Mime as Mime
 import qualified Data.Text.Lazy as DTL
 import Control.Monad.Logger (logInfoN)
+import qualified Branding (visibleName)
 
 
 newAccountEmail, resetAccountEmail :: (YC.MonadIO m, YC.MonadLogger m) => DT.Text -> DT.Text -> DT.Text -> m ()
@@ -42,6 +43,6 @@ makeEmail :: DT.Text -> DT.Text -> DT.Text -> Mime.Mail
 makeEmail uname email url =
 	Mime.simpleMail'
 		(Mime.Address (Just uname) email)
-		(Mime.Address (Just "JackRose Verification") ("root@localhost"))
-		"JackRose Account"
+		(Mime.Address (Just $ DT.append Branding.visibleName " Verification") ("root@localhost"))
+		(DT.append Branding.visibleName " Account")
 		(DTL.concat [ "Your URL is ", DTL.fromChunks [ url ] ])

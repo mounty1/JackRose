@@ -14,7 +14,7 @@ Portability: undefined
 module SiteConfigFromFile (siteObject) where
 
 
-import qualified Data.Text as DT (pack, empty, Text, unpack, concat, toLower)
+import qualified Data.Text as DT (pack, empty, Text, unpack, concat, append, toLower)
 import Data.List ((\\))
 import qualified CommandArgs (CmdLineArgs(..))
 import qualified Data.ConfigFile as DC
@@ -28,6 +28,11 @@ import Control.Monad.STM (atomically)
 import Control.Monad.Logger (LogLevel(..), logDebugNS, logWarnNS, logErrorNS)
 import Control.Monad.Error.Class (catchError)
 import LogFilter (runFilteredLoggingT)
+import qualified Branding (innerName)
+
+
+nameSql :: DT.Text
+nameSql = DT.append Branding.innerName ".sqlite"
 
 
 -- | Called once when the application starts;  it takes the command line parameters object and
@@ -58,8 +63,8 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 		almostAppObject pool =
 			extractConfItem authory AuthoriStyle.Email "trustedSite" $
 				extractConfTextItem DT.empty "appRoot" $
-					extractConfTextItem (DT.pack "jackrose") "dbuser" $
-						extractConfItem id "jackrose.aes" "keysFile" $
+					extractConfTextItem Branding.innerName "dbuser" $
+						extractConfItem id (DT.unpack Branding.innerName ++ ".aes") "keysFile" $
 							extractConfTextItem "users/" "userDir" $
 								extractConfTextItem "default.cfg" "userTemplate" $
 									extractConfItem Just Nothing "portNumber" $
@@ -81,7 +86,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 		extractConfNumItem = extractConfItem read
 
 		-- no point in opening a SQLite database more than once.
-		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem "jackrose.sqlite" "tablesFile" (verbLabel, PerstQ.createSqlitePool)
+		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem nameSql "tablesFile" (verbLabel, PerstQ.createSqlitePool)
 
 		-- we need verbosity early to control logging level
 		(verbLabel, verbosity) = extractConfItem logValue fallbackDebugLevel "verbosity" ([], id)
@@ -92,7 +97,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 	makeUnseenKeyMsg key = DT.concat [ "using default ", key ]
 	-- If a configuration file is specified, it has to exist;  otherwise the default name is used, but may not exist.
 	conFallback = DMy.isNothing (CommandArgs.configName argsMap)
-	configName = DMy.fromMaybe "/etc/jackrose.conf" (CommandArgs.configName argsMap)
+	configName = DMy.fromMaybe ( "/etc/" ++ DT.unpack Branding.innerName ++ ".conf" ) (CommandArgs.configName argsMap)
 	configLogName = DT.pack configName
 
 
