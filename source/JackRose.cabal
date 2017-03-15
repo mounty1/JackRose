@@ -60,7 +60,6 @@ executable JackRose
                       LearningData
                       LearningResync
                       LogFilter
-                      LoginPlease
                       MaybeIntValue
                       Notice,
                       Persistency
