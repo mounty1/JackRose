@@ -15,13 +15,13 @@ module ReviewGet (getHomeR, getReviewR) where
 
 
 import qualified Yesod.Core as YC
+import qualified Yesod.Auth as YA
 import qualified Foundation
 import qualified FailureMessage (page)
 import qualified Data.Text as DT (Text, split, concat, null, pack)
 import qualified Text.XML as XML (Document)
 import qualified Data.Map as DM
 import qualified Data.List as DL (filter, intersperse)
-import LoginPlease (onlyIfAuthorised)
 import qualified JRState (runFilteredLoggingT, userConfig, getUserConfig, getDataSchemes, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
 import LearningData (ViewId, LearnDatum(..), DataRow(..), newItem, dueItem)
@@ -53,7 +53,7 @@ type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) =>
 
 -- | try to extract the login user name from the session; if present, verify that it's logged-in
 getHomeR :: Foundation.Handler YC.Html
-getHomeR = onlyIfAuthorised getLoginR
+getHomeR = YA.requireAuthId >>= getLoginR
 
 
 -- | TODO merge into above.
@@ -75,12 +75,12 @@ verifyUser acctName site =YC.liftIO (userToId site acctName) >>= maybe
 digest :: DT.Text -> Authorisation.UserId -> JRState.JRState -> [UserDeck.UserDeckCpt] -> Foundation.Handler YC.Html
 digest acctName uid site userSchema =
 		(YC.liftIO $ atomically $ modifyTVar' (JRState.userConfig site) (DM.insert acctName (uid, userSchema)))
-		>> onlyIfAuthorised (review [])
+		>> YA.requireAuthId >>= review []
 
 
 -- | show next item for review, for the logged-in user
 getReviewR :: DT.Text -> Foundation.Handler YC.Html
-getReviewR = onlyIfAuthorised . review . DL.filter (not . DT.null) . DT.split (== '/')
+getReviewR path = YA.requireAuthId >>= review (DL.filter (not . DT.null) (DT.split (== '/') path))
 
 
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html

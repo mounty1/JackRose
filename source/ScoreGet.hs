@@ -15,6 +15,7 @@ module ScoreGet (getScoreR) where
 
 
 import qualified Yesod.Core as YC
+import qualified Yesod.Auth as YA
 import qualified Foundation (Handler)
 import qualified Data.Text as DT (Text, concat)
 import qualified Text.XML as XML (Document)
@@ -32,7 +33,6 @@ import qualified SessionItemKey (get, set)
 import ConnectionSpec (DataDescriptor(..))
 import CardExpand (expand)
 import ExternalData (get)
-import LoginPlease (onlyIfAuthorised)
 import qualified Branding (visibleName)
 
 
@@ -41,7 +41,7 @@ type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) =>
 
 -- Process OK button;  first extract item id. from session data
 getScoreR :: Foundation.Handler YC.Html
-getScoreR = onlyIfAuthorised (const $ SessionItemKey.get >>= maybe goHome showAnswer)
+getScoreR = YA.requireAuthId >>= (const $ SessionItemKey.get >>= maybe goHome showAnswer)
 
 
 showAnswer :: Key LearnDatum -> Foundation.Handler YC.Html
@@ -69,6 +69,7 @@ noSomething :: (YC.MonadIO m, ToBackendKey SqlBackend record) => DT.Text -> Key 
 noSomething label item = return $ PH.documentHTML Branding.visibleName $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
 
 
+-- TODO should obtain the view deck hierarchy name as well
 readFromSource :: DT.Text -> DataDescriptor ->  LearningData.View -> LearnItemParameters
 readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse reverze) =
 	YC.liftIO $

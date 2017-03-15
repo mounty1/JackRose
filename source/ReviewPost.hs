@@ -19,18 +19,17 @@ import qualified Yesod.Auth as YA
 import qualified Yesod.Core as YC
 import qualified Foundation
 import Data.Text (Text)
-import LoginPlease (onlyIfAuthorised)
 
 
 -- | user has scored their item so re-schedule it and move to the next.
 postHomeR :: Foundation.Handler YC.Html
-postHomeR = onlyIfAuthorised reveal
+postHomeR = YA.requireAuthId >>= const reveal
 
 
 -- http://lusku.de/blog/entry/1 for how to handle grade buttons
 -- | user has pressed a button; go on from there.
-reveal :: Text -> Foundation.Handler YC.Html
-reveal _ = (Y.runInputPost $ triple <$> Y.iopt Y.textField "stats" <*> Y.iopt Y.textField "OK" <*> Y.iopt Y.textField "logout") >>= YC.redirect . enaction
+reveal :: Foundation.Handler YC.Html
+reveal = (Y.runInputPost $ triple <$> Y.iopt Y.textField "stats" <*> Y.iopt Y.textField "OK" <*> Y.iopt Y.textField "logout") >>= YC.redirect . enaction
 
 
 type OpText = Maybe Text

@@ -20,7 +20,6 @@ import qualified Yesod.Core as YC
 import qualified Foundation
 import qualified Data.Text as DT (Text, null, head)
 import qualified JRState (tablesFile)
-import LoginPlease (onlyIfAuthorised)
 import GoHome (goHome)
 import LearningData (insert, History(..), LearnDatum, updateTimeStamp, lastHistory)
 import SessionItemKey (get)
@@ -36,7 +35,7 @@ import Data.Ratio ((%))
 
 -- | user has scored their item so re-schedule it and move to the next.
 postScoreR :: Foundation.Handler YC.Html
-postScoreR = onlyIfAuthorised score
+postScoreR = YA.requireAuthId >>= score
 
 
 -- http://lusku.de/blog/entry/1 for how to handle grade buttons

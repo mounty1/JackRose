@@ -20,7 +20,6 @@ import qualified Yesod.Core as YC
 import qualified Foundation
 import Data.Text (Text)
 import qualified PresentHTML as PH
-import LoginPlease (onlyIfAuthorised)
 import qualified Branding (visibleName)
 
 
@@ -31,7 +30,7 @@ getNoticeR = PH.toHTMLdoc . PH.documentHTML Branding.visibleName
 
 -- | Respond to button-press from displayed message.
 postNoticeR :: Text -> Foundation.Handler YC.Html
-postNoticeR _ = onlyIfAuthorised proceed
+postNoticeR _ = YA.requireAuthId >>= proceed
 
 
 -- http://lusku.de/blog/entry/1 for how to handle grade buttons
