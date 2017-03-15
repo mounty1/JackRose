@@ -33,12 +33,11 @@ import ConnectionSpec (DataDescriptor(..))
 import CardExpand (expand)
 import ExternalData (get)
 import LoginPlease (onlyIfAuthorised)
+import qualified Branding (visibleName)
 
 
 type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) => ReaderT SqlBackend m XML.Document
 
-
--- TODO Branding
 
 -- Process OK button;  first extract item id. from session data
 getScoreR :: Foundation.Handler YC.Html
@@ -66,13 +65,13 @@ showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRSt
 			>>= maybe (noSomething "view" viewId) (readFromSource key descriptor)
 
 
-noSomething :: (ToBackendKey SqlBackend record) => DT.Text -> Key record -> LearnItemParameters
-noSomething label item = return $ PH.documentHTML "view category" $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
+noSomething :: (YC.MonadIO m, ToBackendKey SqlBackend record) => DT.Text -> Key record -> ReaderT SqlBackend m XML.Document
+noSomething label item = return $ PH.documentHTML Branding.visibleName $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
 
 
 readFromSource :: DT.Text -> DataDescriptor ->  LearningData.View -> LearnItemParameters
-readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View _ _ obverse reverze) =
+readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse reverze) =
 	YC.liftIO $
 		ExternalData.get key keys1y handle
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
-			>>= return . either (PH.documentHTML "view category") (PH.documentXHTML "view category" PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze
+			>>= return . either (PH.documentHTML viewName) (PH.documentXHTML viewName PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze
