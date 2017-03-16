@@ -21,4 +21,3 @@ import Yesod.Core.Handler (sendFile)
 -- | return application icon.
 getIconR :: Handler ()
 getIconR = sendFile "image/x-icon" "favicon.ico"
-

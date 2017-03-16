@@ -53,6 +53,7 @@ executable JackRose
                       EmailVerification
                       ExecuteSqlStmt
                       ExternalData
+                      Favicon
                       FailureMessage
                       Foundation
                       GoHome
