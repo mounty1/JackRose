@@ -53,7 +53,7 @@ type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) =>
 
 -- | try to extract the login user name from the session; if present, verify that it's logged-in
 getHomeR :: Foundation.Handler YC.Html
-getHomeR = YA.requireAuthId >>= getLoginR
+getHomeR = YA.maybeAuthId >>= maybe (YC.redirect (Foundation.AuthR YA.LoginR)) getLoginR
 
 
 -- | TODO merge into above.
@@ -151,11 +151,11 @@ noSomething label item = YC.liftIO $ return $ Just $ Left $ DT.concat [label, " 
 
 
 readFromSource :: Entity LearnDatum -> DT.Text -> [DT.Text] -> DataDescriptor ->  LearningData.View -> LearnItemParameters
-readFromSource item key deckDrilled (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse _) =
+readFromSource item key deckDrilled (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse _ style) =
 	YC.liftIO $
 		ExternalData.get key keys1y handle
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
-			>>= return . Just . fmap (((,) item) . PH.documentXHTML (DT.concat $ DL.intersperse "/" (if null deckDrilled then [] else reverse deckDrilled ++ [":"]) ++ [viewName]) PH.okButton) . CardExpand.expand cols Nothing obverse
+			>>= return . Just . fmap (((,) item) . PH.documentXHTML style (DT.concat $ DL.intersperse "/" (if null deckDrilled then [] else reverse deckDrilled ++ [":"]) ++ [viewName]) PH.okButton) . CardExpand.expand cols Nothing obverse
 
 
 -- put the necessary data into the session so that the POST knows what to add or update.

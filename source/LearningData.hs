@@ -70,6 +70,7 @@ View
 	dataSourceId DataSourceId NOT NULL
 	obverse DT.Text NOT NULL
 	reverse DT.Text NOT NULL
+	styleCSS DT.Text Maybe
 LearnDatum
 	viewUID ViewId NOT NULL
 	itemId DataRowId NOT NULL

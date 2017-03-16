@@ -25,7 +25,7 @@ import qualified Branding (visibleName)
 
 -- | Display a simple message.
 getNoticeR :: Text -> Foundation.Handler YC.Html
-getNoticeR = PH.toHTMLdoc . PH.documentHTML Branding.visibleName
+getNoticeR = PH.toHTMLdoc . PH.documentHTML Nothing Branding.visibleName
 
 
 -- | Respond to button-press from displayed message.

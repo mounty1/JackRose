@@ -1,10 +1,14 @@
 {-|
-Description: Dump-bag of HTML formatting and stuff.  Must be rationalised.
+Description: HTML formatting of question and answer.
 Copyright: (c) Michael Mounteney, 2017
 License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
 Stability: experimental
 Portability: undefined
+
+Uses the CSS3 /flex/ solution at <http://stackoverflow.com/questions/90178/make-a-div-fill-the-height-of-the-remaining-screen-space>.
+For older browsers, <https://www.google.com.au/search?q=html+fill+rest> such as
+<http://stackoverflow.com/questions/21222663/make-nested-div-stretch-to-100-of-remaining-container-div-height/>.
 -}
 
 
@@ -27,12 +31,12 @@ toHTMLdoc :: XML.Document -> Foundation.Handler YC.Html
 toHTMLdoc = YC.liftIO . return . BZH.toHtml
 
 
-documentHTML :: DT.Text -> DT.Text -> XML.Document
-documentHTML title content = documentXHTML title [XML.NodeContent content] okButton
+documentHTML :: Maybe DT.Text -> DT.Text -> DT.Text -> XML.Document
+documentHTML styleCSS title content = documentXHTML styleCSS title [XML.NodeContent content] okButton
 
 
-documentXHTML :: DT.Text -> [XML.Node] ->  [XML.Node] -> XML.Document
-documentXHTML title buttons content = XML.Document standardPrologue (embed title content buttons) []
+documentXHTML :: Maybe DT.Text -> DT.Text -> [XML.Node] -> [XML.Node] -> XML.Document
+documentXHTML styleCSS title buttons content = XML.Document standardPrologue (embed styleCSS title content buttons) []
 
 
 standardPrologue :: XML.Prologue
@@ -43,8 +47,8 @@ standardPrologue =
 		[]
 
 
-embed ::DT.Text -> [XML.Node] -> [XML.Node] -> XML.Element
-embed title content nextButton =
+embed :: Maybe DT.Text -> DT.Text -> [XML.Node] -> [XML.Node] -> XML.Element
+embed styleCSS title content nextButton =
 	XML.Element
 		(nameXML "html")
 		DM.empty
@@ -52,32 +56,24 @@ embed title content nextButton =
 			[]
 			[makeNode "meta"
 				[makeAttribute "http-equiv" "Content-Type",
-					makeAttribute "content" "application/xhtml+xml;charset=utf-8"]
+					makeAttribute "content" "application/xhtml;charset=utf-8"]
 				[],
 			makeNode "title" [] [XML.NodeContent title],
-			makeNode "style" [] [XML.NodeContent ceeSS]
+			makeNode "style" [] [XML.NodeContent $ DT.concat $ maybe [ceeSS1, ceeSS2] (\s -> [ceeSS1, s, ceeSS2]) styleCSS ]
 			],
 		makeNode "body"
-			[makeAttribute "class" "all"]
-			[makeNode "div" [] content,
-			makeNode "div" [] [makeNode "hr" [] []],
+			[ makeAttribute "class" "JRbox" ]
+			[makeNode "div" (maybe [] (const $ [ makeAttribute "class" "JRrow JRcontent" ]) styleCSS) content,
 			makeNode "table"
-				[makeAttribute "width" "100%"]
+				[makeAttribute "class" "JRrow JRfooter"]
 				[makeNode "tr"
-					[]
-					[makeNode "td"
-						(alignAttr "left")
-						[makeNode "form" postAttr [button1 "stats"]],
-					makeNode "td"
-						(alignAttr "center")
-						[makeNode "form" postAttr nextButton],
-					makeNode "td"
-						(alignAttr "right")
-						[makeNode "form" postAttr [button1 "logout"]]
+					[ ]
+					[makeButtonDiv [button1 "stats"],
+					makeButtonDiv nextButton,
+					makeButtonDiv [button1 "logout"]]
 				]
 			]
 		]
-	]
 
 
 okButton, gradeButtons :: [XML.Node]
@@ -102,8 +98,8 @@ postAttr :: [(XML.Name, DT.Text)]
 postAttr = [makeAttribute "method" "post"]
 
 
-alignAttr :: DT.Text -> [(XML.Name, DT.Text)]
-alignAttr alignment = [makeAttribute "style" (DT.concat ["text-align:", alignment, ";"])]
+makeButtonDiv :: [XML.Node] -> XML.Node
+makeButtonDiv buttons = makeNode "td" [makeAttribute "style" "text-align:center;"] [makeNode "form" postAttr buttons]
 
 
 button1 :: DT.Text -> XML.Node
@@ -128,32 +124,6 @@ gradeButton :: Char -> XML.Node
 gradeButton digit = button "grade" (DT.singleton digit)
 
 
-ceeSS :: DT.Text
-ceeSS = ".all {\n\
-	\font-family: Code2000;\n\
-	\font-size: 24pt;\n\
-	\background-color: #00ff80;\n\
-	\text-align: center;\n\
-\}\n\
-\td {\n\
-	\text-align: left;\n\
-\}\n\
-\* {\n\
-	\margin: 0;\n\
-\}\n\
-\html, body {\n\
-	\height: 100%;\n\
-\}\n\
-\div:first-child {\n\
-	\min-height: 100%;\n\
-	\height: auto !important;\n\
-	\height: 100%;\n\
-	\margin: 0 auto -3em;\n\
-\}\n\
-\div + div {\n\
-	\height: 1em;\n\
-\}\n\
-\html body table tbody tr td form {\n\
-	\font-size: 20pt;\n\
-	\text-align: center;\n\
-\}"
+ceeSS1, ceeSS2 :: DT.Text
+ceeSS1 = "html, body { height: 100%; margin: 0; } .JRbox { display: flex; flex-flow: column; height: 100%; } .JRbox .JRrow { border: 1px dotted grey; } .JRbox .JRrow.JRheader { flex: 0 1 auto; } .JRbox .JRrow.JRcontent { flex: 1 1 auto;"
+ceeSS2 = "} .JRbox .JRrow.JRfooter { flex: 0 1 0; width: 100%; }"

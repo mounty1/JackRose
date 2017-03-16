@@ -66,13 +66,13 @@ showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRSt
 
 
 noSomething :: (YC.MonadIO m, ToBackendKey SqlBackend record) => DT.Text -> Key record -> ReaderT SqlBackend m XML.Document
-noSomething label item = return $ PH.documentHTML Branding.visibleName $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
+noSomething label item = return $ PH.documentHTML Nothing Branding.visibleName $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
 
 
 -- TODO should obtain the view deck hierarchy name as well
 readFromSource :: DT.Text -> DataDescriptor ->  LearningData.View -> LearnItemParameters
-readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse reverze) =
+readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse reverze style) =
 	YC.liftIO $
 		ExternalData.get key keys1y handle
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
-			>>= return . either (PH.documentHTML viewName) (PH.documentXHTML viewName PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze
+			>>= return . either (PH.documentHTML style viewName) (PH.documentXHTML style viewName PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze
