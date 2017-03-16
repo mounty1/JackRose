@@ -28,6 +28,7 @@ import ReviewPost (postHomeR)
 import ScoreGet (getScoreR)
 import ScorePost (postScoreR)
 import Notice (getNoticeR, postNoticeR)
+import Favicon (getIconR)
 import Foundation
 import JRState (JRState)
 
