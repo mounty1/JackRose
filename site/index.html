@@ -1,0 +1,81 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+	<head>
+		<title>JackRose</title>
+
+		<META name="Keywords" CONTENT="spaced repetition, learning, SRS">
+
+		<META name="description" CONTENT="Spaced Repetition Web Service">
+
+		<META NAME="ROBOTS" CONTENT="ALL, FOLLOW">
+
+		<!-- link rel="alternate" type="application/rss+xml" title="News feed" href="notices.xml"/ -->
+	</head>
+	<body background="icon-outline.png" bgcolor="#040404">
+		<table>
+			<tr><td><img src="icon.png" height="180" alt="JackRose logo"/></td><td><h1>JackRose</h1></td></tr>
+		</table>
+		<p>JackRose is a new entry in the spaced repetition software category.</p>
+
+		<p>It is not intended to be especially simple, or easy for non-technical people to use.
+		If you want a simple system, you are invited to consider <a href="http://ankisrs.net">Anki</a>.
+		This advice is not flippant or sarcastic;  JackRose
+		requires some computer expertise to set up and is not suitable for newcomers.</p>
+
+		<p>In contrast to the small personal systems that currently dominate the SRS arena,
+		JackRose is designed to handle large data sets efficiently.  It is borne of the
+		author's assessment that the existing SRSs don't scale well to 100s of users
+		with ten of thousands of learnt items.</i>
+
+		<p>The name has no particular significance;  Jack and Rose are two English words that have multiple
+		meanings;  that is all.  It is pronounced with the stress on the first syllable.</p>
+
+		The main distinguishing features are:
+		<ul>
+			<li>It is a web application.  This avoids having to implement a user interface, but it also
+				satisfies the design aim of a large-scale system, in that it can be centrally administered
+				and access granted or denied securely.  Unlike other web-based SRSs however, it is entirely
+				open;  anyone with the knowledge and means can install and run their own JackRose server.</li>
+
+			<li>Open data:  in contrast to systems that require learning data to be imported into their
+				own database, JackRose connects to external data sources, which (currently) can be SQLite3
+				tables, Postgres tables, or tab-separated flat files.  The only requirement is that each data record
+				have a unique and unchanging key.  This allows a business or other organisation to
+				maintain, for example, a lexicon (``foreign-language dictionary'') and JackRose will use
+				the `live' data from it and won't require a periodic refresh or re-import.
+				Similarly, media (sound and video files) can be organised according to the wishes
+				of the user, and do not have to be imported into the application.</li>
+		</ul>
+
+		The main implementation features are:
+		<ul>
+			<li>It implements the Anki concept of separate data (notes, in Anki parlance) and learnt items
+				(cards in Anki parlance;  really, views on the data).</li>
+
+			<li>Written in Haskell;  one clear research finding is that dynamically-typed languages suffer from
+				exponential maintenance complexity and that strong static type checking is an important
+				tool of software engineering to achieve higher reliability.  This of course precludes the
+				Anki model of add-ons (monkey patching) and JackRose must provide user-customisable
+				behaviour either by configuration options or by source modification.  Modern DVCSs
+				allow the preservation of user customisations when source is updated or pulled.</li>
+
+			<li>Importing data is achieved simply by specifying a new data source, having previously
+				used bulk load etc. to populate the source.</li>
+
+			<li>Configurable spacing algorithms;  this is to determine, for a particular learner, which
+				is the most `efficient' algorithm;  be it SM-2, SM-<i>x</i>, Leitner or ANN.</li>
+
+			<li>The business model is that the software is open-source (free) but that you can choose to
+				pay for hosting (which means that you only need a browser to perform
+				daily repetitions) and consultancy.</li>
+		</ul>
+
+		The source is on <a href="https://github.com/mounty1/JackRose">GitHub</a><!-- and there is a
+		<a href="https://jackrose.landcroft.com">sample server</a> which does almost nothing yet -->.
+		
+		<a href="documentation/doc/html/JackRose/JackRose/index.html">Haddock documentation</a>.
+
+		The contact email for enquiries is the name of the project followed by an at sign followed by
+		landcroft dot com.
+	</body>
+</html>

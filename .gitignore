@@ -1,6 +1,6 @@
-site/
+site/*.png
+site/documentation
 .directory
-JackRose.xcf
 source/dist
 source/gentoo
 source/cabal.sandbox.config
