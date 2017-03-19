@@ -53,7 +53,7 @@ type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) =>
 
 -- | try to extract the login user name from the session; if present, verify that it's logged-in
 getHomeR :: Foundation.Handler YC.Html
-getHomeR = YA.maybeAuthId >>= maybe (YC.redirect (Foundation.AuthR YA.LoginR)) getLoginR
+getHomeR = YA.requireAuthId >>= getLoginR
 
 
 -- | TODO merge into above.

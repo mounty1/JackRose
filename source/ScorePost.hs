@@ -36,7 +36,7 @@ import DespatchButtons (despatch)
 
 -- | user has pressed a 'score' button; update database with new review and go to next item
 postScoreR :: Foundation.Handler YC.Html
-postScoreR = despatch (const $ YC.redirect $ Foundation.AuthR YA.LogoutR) routeTable >>= \action -> SessionItemKey.get >>= action
+postScoreR = YA.requireAuthId >> despatch (const $ YC.redirect $ Foundation.AuthR YA.LogoutR) routeTable >>= \action -> SessionItemKey.get >>= action
 
 
 type ParameteredRoute = MaybeKey -> Foundation.Handler YC.Html

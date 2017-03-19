@@ -23,7 +23,7 @@ import DespatchButtons (despatch)
 
 -- | user has pressed a button; go on from there.
 postHomeR :: Foundation.Handler YC.Html
-postHomeR = despatch Foundation.HomeR routeTable >>= YC.redirect
+postHomeR = YA.requireAuthId >> despatch Foundation.HomeR routeTable >>= YC.redirect
 
 
 routeTable :: [( DT.Text, DT.Text -> Foundation.Destination)]

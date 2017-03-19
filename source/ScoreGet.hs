@@ -41,7 +41,7 @@ type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) =>
 
 -- Process OK button;  first extract item id. from session data
 getScoreR :: Foundation.Handler YC.Html
-getScoreR = YA.requireAuthId >>= (const $ SessionItemKey.get >>= maybe goHome showAnswer)
+getScoreR = YA.requireAuthId >> SessionItemKey.get >>= maybe goHome showAnswer
 
 
 showAnswer :: Key LearnDatum -> Foundation.Handler YC.Html
