@@ -50,6 +50,7 @@ executable JackRose
                       DeckData
                       DeckSpec
                       DataSource
+                      DespatchButtons
                       EmailVerification
                       ExecuteSqlStmt
                       ExternalData

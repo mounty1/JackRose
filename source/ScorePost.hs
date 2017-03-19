@@ -8,7 +8,7 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 
 module ScorePost (postScoreR) where
@@ -31,41 +31,35 @@ import Database.Persist.Sqlite (runSqlPool)
 import Database.Persist.Sql (SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
 import Data.Ratio ((%))
+import DespatchButtons (despatch)
 
 
--- | user has scored their item so re-schedule it and move to the next.
-postScoreR :: Foundation.Handler YC.Html
-postScoreR = YA.requireAuthId >>= score
-
-
--- http://lusku.de/blog/entry/1 for how to handle grade buttons
 -- | user has pressed a 'score' button; update database with new review and go to next item
-score :: DT.Text -> Foundation.Handler YC.Html
-score _ = (Y.runInputPost $ triple <$> Y.iopt Y.textField "stats" <*> Y.iopt Y.textField "grade" <*> Y.iopt Y.textField "logout") >>= \action -> SessionItemKey.get >>= enaction action
+postScoreR :: Foundation.Handler YC.Html
+postScoreR = despatch (const $ YC.redirect $ Foundation.AuthR YA.LogoutR) routeTable >>= \action -> SessionItemKey.get >>= action
 
 
-type OpText = Maybe DT.Text
+type ParameteredRoute = MaybeKey -> Foundation.Handler YC.Html
+
+
+routeTable :: [( DT.Text, DT.Text -> ParameteredRoute)]
+routeTable = [
+		( "stats", justGoHome ),
+		( "grade", writeGrade ),
+		( "logout", justLogout )
+	]
 
 
 type MaybeKey = Maybe (Y.Key LearnDatum)
 
 
-triple :: OpText -> OpText -> OpText -> (OpText, OpText, OpText)
-triple one two three = (one, two, three)
+justGoHome, justLogout, writeGrade :: DT.Text -> ParameteredRoute
+
+justGoHome _ _ = goHome
+
+justLogout _ _ = YC.redirect (Foundation.AuthR YA.LogoutR)
 
 
-enaction :: (OpText, OpText, OpText) -> MaybeKey -> Foundation.Handler YC.Html
--- "stats" button pressed;  go to upload/download screen (not yet written)
-enaction (Just _, _, _) _ = goHome
--- one of the grade buttons pressed;  work out which one and score this item
-enaction (Nothing, Just grade, _) itemId = writeGrade grade itemId
--- "logout" button pressed;  so do it.
-enaction (Nothing, Nothing, Just _) _ = YC.redirect (Foundation.AuthR YA.LogoutR)
--- "this should never happen";  not sure what to do here.
-enaction (Nothing, Nothing, Nothing) _ = goHome
-
-
-writeGrade :: DT.Text -> MaybeKey -> Foundation.Handler YC.Html
 writeGrade grade itemId = if DT.null grade then
 		FailureMessage.page "?? null grade ??"
 	else
