@@ -33,6 +33,7 @@ executable JackRose
                       xml,
                       xml-conduit,
                       filepath,
+                      wai,
                       blaze-html,
                       resourcet,
                       mime-mail,

@@ -30,10 +30,8 @@ import qualified Authorisation (User)
 import qualified Database.Persist.Sqlite as PerstQ (SqlBackend, runSqlPool)
 import qualified RouteData
 import qualified EmailVerification
-import qualified Data.Text as DT (concat, append)
 import Data.Text (Text)
 import JRState (JRState(..))
-import TextShow (showt)
 
 
 YC.mkYesodData "JRState" RouteData.routeData
@@ -75,12 +73,6 @@ instance YAA.YesodAuthAccount (YAA.AccountPersistDB JRState Authorisation.User) 
 	runAccountDB = YAA.runAccountPersistDB
 
 
-emailEnaction :: (YC.MonadHandler m, YC.HandlerSite m ~ JRState) => (t -> t1 -> Text -> m b) -> t -> t1 -> Text -> m b
-emailEnaction action uname email url = YC.getYesod >>= enact where
-	enact site = action uname email fullURL where
-		fullURL = DT.concat [appRoot site, maybe "" (DT.append ":" . showt) (portNumber site), url]
-
-
 instance YAA.AccountSendEmail JRState where
-	sendVerifyEmail = emailEnaction EmailVerification.newAccountEmail
-	sendNewPasswordEmail = emailEnaction EmailVerification.resetAccountEmail
+	sendVerifyEmail = EmailVerification.newAccountEmail
+	sendNewPasswordEmail = EmailVerification.resetAccountEmail

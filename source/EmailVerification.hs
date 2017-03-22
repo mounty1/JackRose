@@ -8,25 +8,40 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, GADTs, FlexibleContexts #-}
 
 
 module EmailVerification (newAccountEmail, resetAccountEmail) where
 
 
 import qualified Yesod.Core as YC
+import qualified Yesod.Core.Handler as YH
 import qualified Data.Text as DT (Text, append, concat)
 import qualified Network.Mail.Mime as Mime
 import qualified Data.Text.Lazy as DTL
+import JRState (JRState(..))
 import Control.Monad.Logger (logInfoN)
+import qualified Network.Wai as WAI
 import qualified Branding (visibleName)
+import Data.Text.Encoding (decodeUtf8)
+import TextShow (showt)
 
 
-newAccountEmail, resetAccountEmail :: (YC.MonadIO m, YC.MonadLogger m) => DT.Text -> DT.Text -> DT.Text -> m ()
+-- | Email full URL to user;  first try to get the host from the request;  if that fails, fall back to configuration data.
+emailEnaction :: (YC.MonadLogger m, YC.MonadHandler m, YC.HandlerSite m ~ JRState) => DT.Text -> DT.Text -> DT.Text -> DT.Text -> m ()
+emailEnaction what uname email path = YH.waiRequest >>= \req -> maybe (YC.getYesod >>= enactSc) (\reqq -> enactRq (decodeUtf8 reqq) (WAI.isSecure req)) (WAI.requestHeaderHost req) where
+	enactRq serverHost isSecure = emailAction what uname email fullURL where
+		fullURL = DT.concat [if isSecure then "https" else "http", "://", serverHost, path]
+		-- DT.concat [appRoot site, maybe "" (DT.append ":" . showt) (portNumber site), path]
+	enactSc site = emailAction what uname email fullURL where
+		fullURL = DT.concat [appRoot site, maybe "" (DT.append ":" . showt) (portNumber site), path]
 
-newAccountEmail = emailAction "Verification"
 
-resetAccountEmail = emailAction "Reset password"
+newAccountEmail, resetAccountEmail :: (YC.MonadLogger m, YC.MonadHandler m, YC.HandlerSite m ~ JRState) => DT.Text -> DT.Text -> DT.Text -> m ()
+
+newAccountEmail = emailEnaction "Verification"
+
+resetAccountEmail = emailEnaction "Reset password"
 
 
 emailAction :: (YC.MonadLogger m, YC.MonadIO m) => DT.Text -> DT.Text -> DT.Text -> DT.Text -> m ()
