@@ -7,7 +7,7 @@ Stability: experimental
 Portability: undefined
 
 Uses the CSS3 /flex/ solution at <http://stackoverflow.com/questions/90178/make-a-div-fill-the-height-of-the-remaining-screen-space>.
-For older browsers, <https://www.google.com.au/search?q=html+fill+rest> such as
+If we ever have to support older browsers, <https://www.google.com.au/search?q=html+fill+rest> such as
 <http://stackoverflow.com/questions/21222663/make-nested-div-stretch-to-100-of-remaining-container-div-height/>.
 -}
 
@@ -15,7 +15,7 @@ For older browsers, <https://www.google.com.au/search?q=html+fill+rest> such as
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module PresentHTML where
+module PresentHTML (toHTMLdoc, documentHTML, documentXHTML, gradeButtons, okButton) where
 
 
 import qualified Yesod.Core as YC
@@ -32,11 +32,38 @@ toHTMLdoc = YC.liftIO . return . BZH.toHtml
 
 
 documentHTML :: Maybe DT.Text -> DT.Text -> DT.Text -> XML.Document
-documentHTML styleCSS title content = documentXHTML styleCSS title [XML.NodeContent content] okButton
+documentHTML styleCSS title content = documentXHTML styleCSS title okButton [makeNode "h1" centreAttr [XML.NodeContent content]]
 
 
 documentXHTML :: Maybe DT.Text -> DT.Text -> [XML.Node] -> [XML.Node] -> XML.Document
-documentXHTML styleCSS title buttons content = XML.Document standardPrologue (embed styleCSS title content buttons) []
+documentXHTML styleCSS title nextButton content = XML.Document
+		standardPrologue
+		(XML.Element
+			(nameXML "html")
+			DM.empty
+			[makeNode "head"
+				[]
+				[makeNode "meta"
+					[makeAttribute "http-equiv" "Content-Type",
+						makeAttribute "content" "application/xhtml;charset=utf-8"]
+					[],
+				makeNode "title" [] [XML.NodeContent title],
+				makeNode "style" [] [XML.NodeContent $ DT.concat $ maybe [ceeSS1, ceeSS2] (\s -> [ceeSS1, s, ceeSS2]) styleCSS ]
+				],
+			makeNode "body"
+				[ makeAttribute "class" "JRbox" ]
+				[makeNode "div" [ makeAttribute "class" "JRrow JRcontent" ] content,
+				makeNode "table"
+					[makeAttribute "class" "JRrow JRfooter"]
+					[makeNode "tr"
+						[ ]
+						[makeButtonDiv [button1 "stats"],
+						makeButtonDiv nextButton,
+						makeButtonDiv [button1 "logout"]]
+					]
+				]
+			])
+		[]
 
 
 standardPrologue :: XML.Prologue
@@ -45,35 +72,6 @@ standardPrologue =
 		[XML.MiscInstruction (XML.Instruction "xml" "version=\"1.0\" encoding=\"UTF-8\"")]
 		(Just $ XML.Doctype "html" Nothing)
 		[]
-
-
-embed :: Maybe DT.Text -> DT.Text -> [XML.Node] -> [XML.Node] -> XML.Element
-embed styleCSS title content nextButton =
-	XML.Element
-		(nameXML "html")
-		DM.empty
-		[makeNode "head"
-			[]
-			[makeNode "meta"
-				[makeAttribute "http-equiv" "Content-Type",
-					makeAttribute "content" "application/xhtml;charset=utf-8"]
-				[],
-			makeNode "title" [] [XML.NodeContent title],
-			makeNode "style" [] [XML.NodeContent $ DT.concat $ maybe [ceeSS1, ceeSS2] (\s -> [ceeSS1, s, ceeSS2]) styleCSS ]
-			],
-		makeNode "body"
-			[ makeAttribute "class" "JRbox" ]
-			[makeNode "div" (maybe [] (const $ [ makeAttribute "class" "JRrow JRcontent" ]) styleCSS) content,
-			makeNode "table"
-				[makeAttribute "class" "JRrow JRfooter"]
-				[makeNode "tr"
-					[ ]
-					[makeButtonDiv [button1 "stats"],
-					makeButtonDiv nextButton,
-					makeButtonDiv [button1 "logout"]]
-				]
-			]
-		]
 
 
 okButton, gradeButtons :: [XML.Node]
@@ -94,12 +92,15 @@ nameXML :: DT.Text -> XML.Name
 nameXML tag = XML.Name tag Nothing Nothing
 
 
-postAttr :: [(XML.Name, DT.Text)]
+postAttr, centreAttr :: [(XML.Name, DT.Text)]
+
 postAttr = [makeAttribute "method" "post"]
+
+centreAttr = [makeAttribute "style" "text-align:center;"]
 
 
 makeButtonDiv :: [XML.Node] -> XML.Node
-makeButtonDiv buttons = makeNode "td" [makeAttribute "style" "text-align:center;"] [makeNode "form" postAttr buttons]
+makeButtonDiv buttons = makeNode "td" centreAttr [makeNode "form" postAttr buttons]
 
 
 button1 :: DT.Text -> XML.Node

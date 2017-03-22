@@ -109,10 +109,10 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 
 	-- insert one learn datum;  (return . return) makes a RowResult from a LearnDatum
 	insertLearnDatum :: UTCTime -> Key DataRow -> (UserId, ViewId) -> RowResult (Key LearnDatum)
-	insertLearnDatum timeStamp itemId (user, view) = insertBy(mkLearnDatum view itemId user 0 timeStamp) >>= either alreadyDatumHuh (return . return)
+	insertLearnDatum timeStamp itemId (user, view) = insertBy(mkLearnDatum view itemId user 0 1 0.3 86400 timeStamp) >>= either alreadyDatumHuh (return . return)
 
 	-- as above, this should not happen.
-	alreadyDatumHuh (Entity _ (LearnDatum vId _ _ _ _)) = alreadyRowPresent "learn datum" (showt $ fromSqlKey vId)
+	alreadyDatumHuh (Entity _ (LearnDatum vId _ _ _ _ _ _ _)) = alreadyRowPresent "learn datum" (showt $ fromSqlKey vId)
 
 	logKeyDelta label rowIds = sequence $ map (\rowId -> logInfoNS dataNameString $ DT.concat [dataSourceString, ": ", label, " \"", rowId, "\""]) rowIds
 

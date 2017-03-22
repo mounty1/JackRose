@@ -76,6 +76,9 @@ LearnDatum
 	itemId DataRowId NOT NULL
 	user UserId NOT NULL
 	activity Int8 NOT NULL
+	spaceAlgorithm Int8 NOT NULL
+	factor1 Double NOT NULL
+	factor2 Double NOT NULL
 	nextReview UTCTime NOT NULL
 	LearnItem viewUID itemId user
 History
@@ -91,6 +94,10 @@ History
 	2 active
 	3 suppressed by selection criteria
 -}
+
+{- For LearnDatum, the 'factor' data have a meaning determined by the spacing algorithm;
+    in a PL the algorithm and factors would be a Data type or variant record.
+    For the full horror, see ScorePost.hs -}
 
 type PersistResult a = forall (m :: * -> *). Y.MonadIO m => ReaderT SqlBackend m a
 
@@ -126,7 +133,7 @@ mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Unique LearnDatum
 mkLearnDatumKey = LearnItem
 
 
-mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> UTCTime -> LearnDatum
+mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> Int8 -> Double -> Double -> UTCTime -> LearnDatum
 mkLearnDatum = LearnDatum
 
 

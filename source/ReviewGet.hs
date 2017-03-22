@@ -134,7 +134,7 @@ runItemQuery site fn deckDrilled = JRState.runFilteredLoggingT site (runSqlPool 
 	fn2 = fn >>= maybe (return Nothing) getItemAndViewIds
 
 	getItemAndViewIds :: Entity LearnDatum -> LearnItemParameters
-	getItemAndViewIds item@(Entity _ (LearnDatum _ itemId _ _ _)) = LearningData.get itemId
+	getItemAndViewIds item@(Entity _ (LearnDatum _ itemId _ _ _ _ _ _)) = LearningData.get itemId
 			>>= maybe (noSomething "data row" itemId) (formatItem item)
 
 	formatItem :: Entity LearnDatum -> DataRow -> LearnItemParameters
@@ -142,7 +142,7 @@ runItemQuery site fn deckDrilled = JRState.runFilteredLoggingT site (runSqlPool 
 			>>= maybe (noSomething "live data source" source) (readFromView item key) . DM.lookup source
 
 	readFromView :: Entity LearnDatum -> DT.Text -> DataDescriptor -> LearnItemParameters
-	readFromView item@(Entity _ (LearnDatum viewId _ _ _ _)) key descriptor = LearningData.get viewId
+	readFromView item@(Entity _ (LearnDatum viewId _ _ _ _ _ _ _)) key descriptor = LearningData.get viewId
 			>>= maybe (noSomething "view" viewId) (readFromSource item key deckDrilled descriptor)
 
 
