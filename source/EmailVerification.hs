@@ -29,7 +29,7 @@ import TextShow (showt)
 
 -- | Email full URL to user;  first try to get the host from the request;  if that fails, fall back to configuration data.
 emailEnaction :: (YC.MonadLogger m, YC.MonadHandler m, YC.HandlerSite m ~ JRState) => DT.Text -> DT.Text -> DT.Text -> DT.Text -> m ()
-emailEnaction what uname email path = YH.waiRequest >>= \req -> maybe (YC.getYesod >>= enactSc) (\reqq -> enactRq (decodeUtf8 reqq) (WAI.isSecure req)) (WAI.requestHeaderHost req) where
+emailEnaction what uname email path = YH.waiRequest >>= \req -> maybe (YC.getYesod >>= enactSc) (\hostName -> enactRq (decodeUtf8 hostName) (WAI.isSecure req)) (WAI.requestHeaderHost req) where
 	enactRq serverHost isSecure = emailAction what uname email fullURL where
 		fullURL = DT.concat [if isSecure then "https" else "http", "://", serverHost, path]
 		-- DT.concat [appRoot site, maybe "" (DT.append ":" . showt) (portNumber site), path]
