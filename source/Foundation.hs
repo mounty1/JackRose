@@ -53,6 +53,7 @@ instance YA.YesodAuth JRState where
 
 
 instance YC.Yesod JRState where
+	authRoute _ = Just $ AuthR YA.LoginR
 	makeSessionBackend site =
 		(if secureOnly site then YC.sslOnlySessions else id) $ fmap Just $ YC.defaultClientSessionBackend (sessionTimeout site) (keysFile site)
 	yesodMiddleware handler = YC.getYesod >>= ourMiddleWare where
