@@ -65,12 +65,10 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 				extractConfTextItem DT.empty "appRoot" $
 					extractConfTextItem Branding.innerName "dbuser" $
 						extractConfItem id (DT.unpack Branding.innerName ++ ".aes") "keysFile" $
-							extractConfTextItem "users/" "userDir" $
-								extractConfTextItem "default.cfg" "userTemplate" $
-									extractConfItem Just Nothing "portNumber" $
-										extractConfNumItem 120 "sessionMinutes" $
-											extractConfItem id False "shuffle" $
-												extractConfItem id True "secureSession" $ (connLabels, JRState.JRState verbosity pool)
+							extractConfItem Just Nothing "portNumber" $
+								extractConfNumItem 120 "sessionMinutes" $
+									extractConfItem id False "shuffle" $
+										extractConfItem id True "secureSession" $ (connLabels, JRState.JRState verbosity pool)
 		-- create the site object and return it, logging information, warnings and errors as required.
 		spliceShared :: Show l => ([DT.Text], TVar JRState.PostgresConnPool -> TVar JRState.DataSchemes -> TVar JRState.UserConfig -> JRState.JRState) -> Either l [String] -> IO JRState.JRState
 		spliceShared (labels, fn) keysE = runFilteredLoggingT verbosity (either munchErr munchKeys keysE) >> return site where

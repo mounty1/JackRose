@@ -51,10 +51,6 @@ data JRState = JRState {
 			-- ^ in minutes
 		portNumber :: Maybe Int,
 			-- ^ useful to override for non-privileged testing
-		userTemplate :: Text,
-			-- starting template;  copied when a new user account be set up.
-		userDir :: Text,
-			-- directory containing user configurations.
 		keysFile :: FilePath,
 			-- ^ AES keys
 		databaseUser :: Text,
