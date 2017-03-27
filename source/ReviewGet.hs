@@ -42,7 +42,7 @@ import UserToId (userToId)
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar (modifyTVar')
 import qualified SessionItemKey (set)
-import qualified ExternalData (get)
+import qualified ExternalSQL (get)
 
 
 type PresentationParams = Either DT.Text (Entity LearnDatum, XML.Document)
@@ -153,7 +153,7 @@ noSomething label item = YC.liftIO $ return $ Just $ Left $ DT.concat [label, " 
 readFromSource :: Entity LearnDatum -> DT.Text -> [DT.Text] -> DataDescriptor ->  LearningData.View -> LearnItemParameters
 readFromSource item key deckDrilled (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse _ style) =
 	YC.liftIO $
-		ExternalData.get key keys1y handle
+		ExternalSQL.get key keys1y handle
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
 			>>= return . Just . fmap (((,) item) . PH.documentXHTML style (DT.concat $ DL.intersperse "/" (if null deckDrilled then [] else reverse deckDrilled ++ [":"]) ++ [viewName]) PH.okButton) . CardExpand.expand cols Nothing obverse
 

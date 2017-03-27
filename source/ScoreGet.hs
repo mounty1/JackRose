@@ -32,7 +32,7 @@ import qualified PresentHTML as PH
 import qualified SessionItemKey (get, set)
 import ConnectionSpec (DataDescriptor(..))
 import CardExpand (expand)
-import ExternalData (get)
+import ExternalSQL (get)
 import qualified Branding (visibleName)
 
 
@@ -73,6 +73,6 @@ noSomething label item = return $ PH.documentHTML Nothing Branding.visibleName $
 readFromSource :: DT.Text -> DataDescriptor ->  LearningData.View -> LearnItemParameters
 readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse reverze style) =
 	YC.liftIO $
-		ExternalData.get key keys1y handle
+		ExternalSQL.get key keys1y handle
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
 			>>= return . either (PH.documentHTML style viewName) (PH.documentXHTML style viewName PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze

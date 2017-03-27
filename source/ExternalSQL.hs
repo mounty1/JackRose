@@ -7,7 +7,7 @@ Stability: experimental
 Portability: undefined
 -}
 
-module ExternalData (get) where
+module ExternalSQL (get) where
 
 
 import qualified Data.List as DL (intersperse, concat)
