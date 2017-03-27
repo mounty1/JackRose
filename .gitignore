@@ -2,7 +2,6 @@ site/*.png
 site/documentation
 .directory
 source/dist
-source/gentoo
 source/cabal.sandbox.config
 sandbox/jackrose.aes
 sandbox/jackrose.sqlite
