@@ -1,3 +1,7 @@
+# READ CAREFULLY;  MARKDOWN PROBLEMS UNRESOLVED.
+
+# 
+
 # RUNNING JACKROSE
 
 The phases required are:
@@ -24,7 +28,7 @@ If you want to run Postgres locally, install `pkgs.postgresql` as well.
 
 ## On Gentoo
 
-> # emerge ghc cabal
+    # emerge ghc cabal
 
 ## Ubuntu, Mess Windoze etc.
 
@@ -35,8 +39,10 @@ https://www.haskell.org/platform/ is the way to go here.
 # Downloading and building JackRose itself
 
 Download the software:
-> $ git clone https://github.com/mounty1/JackRose.git
-> $ cd JackRose
+
+    $ git clone https://github.com/mounty1/JackRose.git
+
+    $ cd JackRose
 
 Modify sandbox/jackrose.conf to task.
 
@@ -46,7 +52,7 @@ _You will need an interactive tool (psql or sqlitebrowser) for your chosen back-
 For Postgres, the dataStore value must be of the form _dbi:Pg:arg=value[;...]_
 For SQLite, it is just a file name.
 
-> $ cd source
+    $ cd source
 
 Then proceed according to your platform, below.
 
@@ -55,13 +61,13 @@ Then proceed according to your platform, below.
 These are for the author's systems and the paths at least _will_ require tweaking for other situations.
 
 ### CentOS 7 + stack
-> $ stack build --verbosity warn --allow-different-user --install-ghc --haddock && (cd ../sandbox;../source/.stack-work/install/x86_64-linux/lts-7.0/8.0.1/bin/JackRose -c ./jackrose.conf)
+    $ stack build --verbosity warn --allow-different-user --install-ghc --haddock && (cd ../sandbox;../source/.stack-work/install/x86_64-linux/lts-7.0/8.0.1/bin/JackRose -c ./jackrose.conf)
 
 ### NixOS + Nix
-> $ cabal2nix . >default.nix && nix-build JackRose.nix && (cd ../sandbox;/nix/store/wnpz8zwvmk96ad07190caqwgv2mhbqjs-JackRose-0.8/bin/JackRose -c jackrose.conf)
+    $ cabal2nix . >default.nix && nix-build JackRose.nix && (cd ../sandbox;/nix/store/wnpz8zwvmk96ad07190caqwgv2mhbqjs-JackRose-0.8/bin/JackRose -c jackrose.conf)
 
 ### Gentoo + cabal
-> $ cabal sandbox init && cabal install && (cd ../sandbox/;../source/.cabal-sandbox/bin/JackRose -c jackrose.conf)
+    $ cabal sandbox init && cabal install && (cd ../sandbox/;../source/.cabal-sandbox/bin/JackRose -c jackrose.conf)
 
 ## Running JackRose
 
@@ -86,25 +92,25 @@ be in Postgres tables or views.
 First set up some data to memorise.  This example uses the numbers one to ten in various European languages.
 Set up a table in your choice of **Postgres** database:
 
-> CREATE TABLE numbers (
->     value integer NOT NULL PRIMARY KEY,
->     english character varying NOT NULL,
->     french character varying NOT NULL,
->     german character varying NOT NULL,
->     spanish character varying NOT NULL,
->     greek character varying NOT NULL
-> );
+    CREATE TABLE numbers (
+        value integer NOT NULL PRIMARY KEY,
+        english character varying NOT NULL,
+        french character varying NOT NULL,
+        german character varying NOT NULL,
+        spanish character varying NOT NULL,
+        greek character varying NOT NULL
+    );
 
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (1, 'one', 'un', 'eins', 'uno', 'εἷς');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (2, 'two', 'deux', 'zwei', 'dos', 'δύο');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (3, 'three', 'trois', 'drei', 'tres', 'τρεῖς');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (4, 'four', 'quatre', 'vier', 'cuatro', 'τέττᾰρες');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (5, 'five', 'cinq', 'funf', 'cinco', 'πέντε');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (6, 'six', 'six', 'sechs', 'seis', 'ἕξ');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (7, 'seven', 'sept', 'sieben', 'siete', 'ἑπτᾰ́');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (8, 'eight', 'huit', 'acht', 'ocho', 'ὀκτώ');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (9, 'nine', 'neuf', 'neun', 'nueve', 'ἐννέᾰ');
-> INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (10, 'ten', 'dix', 'zehn', 'die', 'δέκα');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (1, 'one', 'un', 'eins', 'uno', 'εἷς');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (2, 'two', 'deux', 'zwei', 'dos', 'δύο');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (3, 'three', 'trois', 'drei', 'tres', 'τρεῖς');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (4, 'four', 'quatre', 'vier', 'cuatro', 'τέττᾰρες');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (5, 'five', 'cinq', 'funf', 'cinco', 'πέντε');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (6, 'six', 'six', 'sechs', 'seis', 'ἕξ');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (7, 'seven', 'sept', 'sieben', 'siete', 'ἑπτᾰ́');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (8, 'eight', 'huit', 'acht', 'ocho', 'ὀκτώ');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (9, 'nine', 'neuf', 'neun', 'nueve', 'ἐννέᾰ');
+    INSERT INTO numbers (value, english, french, german, spanish, greek) VALUES (10, 'ten', 'dix', 'zehn', 'die', 'δέκα');
 
 This table can be on the same Postgres server as you use below for JackRoses own data, or a different one, but it must be
 accessible to the running JackRose server and it must (for the time being) be Postgres.
@@ -120,12 +126,14 @@ Run your interactive database tool as user _jackrose_, connected to the Postgres
 the _dataStore_ in _jackrose.conf_ above.  You can see yourself in the _users_ table.
 If you were unable click on the confirmation link for any reason, you can fix this now by setting the _verified_ field:
 
-> update "User" set verified=True;
+    update "User" set verified=True;
 
 Since this is a fresh installation, there should be only one row (you) in the _User_ table.
 
 First tell JackRose about the 'data source';  i.e., the table containing data you wish to memorise.
-> INSERT INTO data_source (id, accessor_write, accessor_read, name, source_serial, resynced) VALUES (1, 0, 0, 'numbers', 'P:services:::numbers:mounty:', '2017-03-28 06:08:58.628821+00');
+
+    INSERT INTO data_source (id, accessor_write, accessor_read, name, source_serial, resynced) VALUES (1, 0, 0, 'numbers', 'P:services:::numbers:mounty:', '2017-03-28 06:08:58.628821+00');
+
 The source_serial value is a colon-separated list of:
 * P for Postgres
 * server host name
@@ -138,22 +146,26 @@ The source_serial value is a colon-separated list of:
 Then set up how we want to memorise the data.  We don't want to memorise all combinations.
 For example, in a school context, some pupils will be learning only French, some French and
 German etc.  We insert a view for each, which is somewhat analogous to a _card_ in Anki parlance.
-> INSERT INTO view (id, name, data_source_id, obverse, reverse, style_c_s_s) VALUES (1, 'econosphere', 1, 'What is the German for <field name="english"/>', '<frontSide/><hr/><field name="german"/>', 'font-family: Code2000;
-> font-size:24pt;
-> background-color: #00ff80;
-> text-align: center;');
-> INSERT INTO view (id, name, data_source_id, obverse, reverse, style_c_s_s) VALUES (2, 'engtogreek', 1, 'What is the Greek for <field name="english"/>', '<frontSide/><hr/><field name="greek"/>', 'font-family: Code2000;
-> font-size:24pt;
-> text-align: center;
-> background-color: #00ff80;');
+
+    INSERT INTO view (id, name, data_source_id, obverse, reverse, style_c_s_s) VALUES (1, 'econosphere', 1, 'What is the German for <field name="english"/>', '<frontSide/><hr/><field name="german"/>', 'font-family: Code2000;
+    font-size:24pt;
+    background-color: #00ff80;
+    text-align: center;');
+    INSERT INTO view (id, name, data_source_id, obverse, reverse, style_c_s_s) VALUES (2, 'engtogreek', 1, 'What is the Greek for <field name="english"/>', '<frontSide/><hr/><field name="greek"/>', 'font-family: Code2000;
+    font-size:24pt;
+    text-align: center;
+    background-color: #00ff80;');
+    
 That last column is obviously some CSS to apply to the questions and answers.   You can put it all on one line if you prefer.
 Omit or change the _font-family_ value if you don't have the Code2000 font.
 The obverse and reverse columns are strict XHTML.
 
 Now specify for yourself which 'views' you want to see.
 If you don't want to learn the (Attic) Greek numbers for example, omit the second row.
-> INSERT INTO user_deck_end (view_id, "user", parent, throttle, shuffle) VALUES (1, 1, NULL, NULL, NULL);
-> INSERT INTO user_deck_end (view_id, "user", parent, throttle, shuffle) VALUES (2, 1, NULL, NULL, NULL);
+
+    INSERT INTO user_deck_end (view_id, "user", parent, throttle, shuffle) VALUES (1, 1, NULL, NULL, NULL);
+    INSERT INTO user_deck_end (view_id, "user", parent, throttle, shuffle) VALUES (2, 1, NULL, NULL, NULL);
+
 With this setup we are not using the German and Spanish columns but you can set up a view for them if you wish.
 
 Quit the interactive tool and start the JackRose server again.  This time you will see it print the rows from the _numbers_
