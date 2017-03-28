@@ -23,9 +23,8 @@ import qualified Data.Map as DM
 import qualified JRState (runFilteredLoggingT, getDataSchemes, JRState, tablesFile)
 import LearningData (LearnDatum(..), DataRow(..))
 import qualified LearningData (get, View(..))
-import Database.Persist.Sqlite (runSqlPool)
 import TextShow (showt)
-import Database.Persist.Sql (fromSqlKey, Key, ToBackendKey, SqlBackend)
+import Database.Persist.Sql (runSqlPool, fromSqlKey, Key, ToBackendKey, SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
 import GoHome (goHome)
 import qualified PresentHTML as PH

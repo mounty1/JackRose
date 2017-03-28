@@ -22,7 +22,8 @@ import qualified Data.Maybe as DMy
 import qualified AuthoriStyle (Style(..))
 import qualified JRState (JRState(..), PostgresConnPool, DataSchemes, UserConfig)
 import qualified Data.Map as DM (empty)
-import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool, ConnectionPool)
+import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool)
+import Database.Persist.Sql (ConnectionPool)
 import Control.Concurrent.STM (newTVar, TVar)
 import Control.Monad.STM (atomically)
 import Control.Monad.Logger (LogLevel(..), logDebugNS, logWarnNS, logErrorNS)
@@ -58,7 +59,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 		-- accumulate up the fields of the site object, one by one.
 		-- the list of configuration key values is of course static, but subject to maintenance.
 		-- Don't try to read anything in class Read because the parser expects quotation marks around it
-		makeAppObject :: PerstQ.ConnectionPool -> IO JRState.JRState
+		makeAppObject :: ConnectionPool -> IO JRState.JRState
 		makeAppObject pool = spliceShared (almostAppObject pool) (DC.options configuration defaultSection)
 		almostAppObject pool =
 			extractConfItem authory AuthoriStyle.Email "trustedSite" $

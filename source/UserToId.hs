@@ -17,10 +17,9 @@ module UserToId (userToId) where
 import Authorisation (mkUser, User)
 import JRState (runFilteredLoggingT, tablesFile, JRState)
 import Database.Persist (getBy)
-import Database.Persist.Sqlite (runSqlPool)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Trans.Control (MonadBaseControl)
-import Database.Persist.Sql (Entity)
+import Database.Persist.Sql (runSqlPool, Entity)
 import qualified Data.Text as DT (Text)
 
 

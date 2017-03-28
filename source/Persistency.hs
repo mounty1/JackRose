@@ -14,7 +14,7 @@ Portability: undefined
 module Persistency (upgradeDB) where
 
 
-import qualified Database.Persist.Sqlite as PerstQ
+import qualified Database.Persist.Sql as PerstQ
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Trans.Control (MonadBaseControl)
 

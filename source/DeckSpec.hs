@@ -30,8 +30,7 @@ import qualified UserDeck (UserDeckCpt(..))
 import qualified DeckData as DD
 import Database.Persist.Types (entityVal)
 import Authorisation (UserId)
-import Database.Persist.Sqlite (runSqlPool)
-import Database.Persist.Sql as DPQ (Entity(Entity))
+import Database.Persist.Sql as DPQ (runSqlPool, Entity(Entity))
 
 
 newtype ParsingResult a = ParsingResult (LoggingT IO (Either DT.Text a))
@@ -79,8 +78,8 @@ content userId site = JRState.runFilteredLoggingT site $ unwrapPR $ topDeck user
 
 
 topDeck :: UserId -> JRState.JRState -> ParsingResult [UserDeck.UserDeckCpt]
-topDeck uid site = runSqlPool (DD.userDeckEnds uid) (JRState.tablesFile site) >>=
-		\terminals -> runSqlPool (DD.userDeckNodes uid) (JRState.tablesFile site) >>=
+topDeck uid site = DPQ.runSqlPool (DD.userDeckEnds uid) (JRState.tablesFile site) >>=
+		\terminals -> DPQ.runSqlPool (DD.userDeckNodes uid) (JRState.tablesFile site) >>=
 			return . levelFilter isNothing (JRState.shuffleCards site) terminals
 
 

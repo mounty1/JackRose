@@ -11,7 +11,7 @@ Portability: undefined
 module JRState where
 
 
-import Database.Persist.Sqlite (ConnectionPool)
+import Database.Persist.Sql (ConnectionPool)
 import AuthoriStyle (Style)
 import Authorisation (UserId)
 import Data.Text (Text)

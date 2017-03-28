@@ -27,7 +27,7 @@ import qualified Yesod.Core as YC
 import qualified Yesod.Auth as YA
 import qualified Yesod.Auth.Account as YAA
 import qualified Authorisation (User)
-import qualified Database.Persist.Sqlite as PerstQ (SqlBackend, runSqlPool)
+import qualified Database.Persist.Sql as PerstQ (SqlBackend, runSqlPool)
 import qualified RouteData
 import qualified EmailVerification
 import Data.Text (Text)
