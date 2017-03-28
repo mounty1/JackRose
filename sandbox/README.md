@@ -8,8 +8,8 @@ The phases required are:
 - Running JackRose.
 - Connecting to JackRose from a web browser.
 
-Please send suggestions and errata to {the project name} at landcroft dot com.
-Please also email if you get through all this lot and get JackRose running.
+**Please send suggestions and errata to {the project name} at landcroft dot com.**
+**Please also email if you get through all this lot and get JackRose running.**
 
 # The building software
 
@@ -39,13 +39,12 @@ Download the software:
     $ git clone https://github.com/mounty1/JackRose.git
     $ cd JackRose
 
-Modify sandbox/jackrose.conf to task.
+Modify sandbox/jackrose.conf to taste.
 
-If you choose Postgres for JackRoses own data store (the dataStore value) you must
-create a suitable user with password in your Postgres instance.
 You will need an interactive tool (psql or sqlitebrowser) for your chosen back-end.
 For Postgres, the dataStore value must be of the form _dbi:Pg:arg=value[;...]_
 For SQLite, it is just a file name.
+If you choose Postgres, you must create a matching database, user and password.
 
     $ cd source
 
@@ -117,7 +116,7 @@ Now it is necessary to tell JackRose about this table and how we want to memoris
 When JackRose is a complete product there will be a nice friendly interface to configure all this but for
 the time being you must tell it manually by populating its configuration tables.
 
-Run your interactive database tool as user _jackrose_, connected to the Postgres server you configured as
+Run your interactive database tool as user _jackrose_, connected to the server you configured as
 the _dataStore_ in _jackrose.conf_ above.  You can see yourself in the _users_ table.
 If you were unable click on the confirmation link for any reason, you can fix this now by setting the _verified_ field:
 
@@ -125,7 +124,7 @@ If you were unable click on the confirmation link for any reason, you can fix th
 
 Since this is a fresh installation, there should be only one row (you) in the _User_ table.
 
-First tell JackRose about the 'data source';  i.e., the table containing data you wish to memorise.
+Next, tell JackRose about the 'data source';  i.e., the table containing data you wish to memorise.
 
     INSERT INTO data_source (id, accessor_write, accessor_read, name, source_serial, resynced) VALUES (1, 0, 0, 'numbers', 'P:services:::numbers:mounty:', '2017-03-28 06:08:58.628821+00');
 
@@ -179,7 +178,7 @@ the process is just as with any other SRS:  log in, do your repetitions, log out
 
 One difference that might surprise is that JackRose computes intervals in seconds, not days.  If you do your repetitions at
 one time each day, this will not affect you.  It does mean that if you log in again a second time on the same day,
-you might see some repetitions.  If you don't like this, don't log in for the second time.
+you will likely see some repetitions.  If you don't like this, don't log in for the second time.
 
 ## Read-only access to Postgres tables
 
