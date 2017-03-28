@@ -55,7 +55,7 @@ executable JackRose
                       DespatchButtons
                       EmailVerification
                       ExecuteSqlStmt
-                      ExternalData
+                      ExternalSQL
                       Favicon
                       FailureMessage
                       Foundation
