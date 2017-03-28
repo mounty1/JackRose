@@ -1,7 +1,3 @@
-# READ CAREFULLY;  MARKDOWN PROBLEMS UNRESOLVED.
-
-# 
-
 # RUNNING JACKROSE
 
 The phases required are:
@@ -41,14 +37,13 @@ https://www.haskell.org/platform/ is the way to go here.
 Download the software:
 
     $ git clone https://github.com/mounty1/JackRose.git
-
     $ cd JackRose
 
 Modify sandbox/jackrose.conf to task.
 
 If you choose Postgres for JackRoses own data store (the dataStore value) you must
 create a suitable user with password in your Postgres instance.
-_You will need an interactive tool (psql or sqlitebrowser) for your chosen back-end_.
+You will need an interactive tool (psql or sqlitebrowser) for your chosen back-end.
 For Postgres, the dataStore value must be of the form _dbi:Pg:arg=value[;...]_
 For SQLite, it is just a file name.
 
@@ -120,7 +115,7 @@ but you can change the _views_ below to fix that.
 
 Now it is necessary to tell JackRose about this table and how we want to memorise the information in it.
 When JackRose is a complete product there will be a nice friendly interface to configure all this but for
-the time being you must populate its tables manually.
+the time being you must tell it manually by populating its configuration tables.
 
 Run your interactive database tool as user _jackrose_, connected to the Postgres server you configured as
 the _dataStore_ in _jackrose.conf_ above.  You can see yourself in the _users_ table.
