@@ -67,6 +67,7 @@ executable JackRose
                       MaybeIntValue
                       Notice,
                       Persistency
+                      PersistOpenGeneral
                       PresentHTML
                       ReviewGet
                       ReviewPost
@@ -92,6 +93,7 @@ executable AnkiConvert
                       persistent,
                       transformers,
                       persistent,
+                      persistent-postgresql,
                       persistent-sqlite,
                       monad-control,
                       monad-logger,
@@ -118,6 +120,7 @@ executable AnkiConvert
                       LogFilter
                       MaybeIntValue
                       Persistency
+                      PersistOpenGeneral
                       SiteConfigFromFile
                       SplitList
                       TextList

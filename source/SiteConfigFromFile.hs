@@ -22,7 +22,6 @@ import qualified Data.Maybe as DMy
 import qualified AuthoriStyle (Style(..))
 import qualified JRState (JRState(..), PostgresConnPool, DataSchemes, UserConfig)
 import qualified Data.Map as DM (empty)
-import qualified Database.Persist.Sqlite as PerstQ (createSqlitePool)
 import Database.Persist.Sql (ConnectionPool)
 import Control.Concurrent.STM (newTVar, TVar)
 import Control.Monad.STM (atomically)
@@ -30,6 +29,7 @@ import Control.Monad.Logger (LogLevel(..), logDebugNS, logWarnNS, logErrorNS)
 import Control.Monad.Error.Class (catchError)
 import LogFilter (runFilteredLoggingT)
 import qualified Branding (innerName)
+import PersistOpenGeneral (createSqlAnyPool)
 
 
 nameSql :: DT.Text
@@ -85,7 +85,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 		extractConfNumItem = extractConfItem read
 
 		-- no point in opening a SQLite database more than once.
-		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem nameSql "tablesFile" (verbLabel, PerstQ.createSqlitePool)
+		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem nameSql "tablesFile" (verbLabel, createSqlAnyPool)
 
 		-- we need verbosity early to control logging level
 		(verbLabel, verbosity) = extractConfItem logValue fallbackDebugLevel "verbosity" ([], id)
