@@ -33,7 +33,6 @@ import qualified SessionItemKey (get, set)
 import ConnectionSpec (DataDescriptor(..))
 import CardExpand (expand)
 import ExternalSQL (get)
-import qualified Branding (visibleName)
 
 
 type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) => ReaderT SqlBackend m XML.Document
@@ -66,7 +65,7 @@ showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRSt
 
 
 noSomething :: (YC.MonadIO m, ToBackendKey SqlBackend record) => DT.Text -> Key record -> ReaderT SqlBackend m XML.Document
-noSomething label item = return $ PH.documentHTML Nothing Branding.visibleName $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
+noSomething label item = return $ PH.documentHTMLNotice $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
 
 
 -- TODO should obtain the view deck hierarchy name as well

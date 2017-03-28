@@ -19,13 +19,12 @@ import qualified Yesod.Core as YC
 import qualified Foundation
 import Data.Text (Text)
 import qualified PresentHTML as PH
-import qualified Branding (visibleName)
 import DespatchButtons (despatch)
 
 
 -- | Display a simple message.
 getNoticeR :: Text -> Foundation.Handler YC.Html
-getNoticeR = PH.toHTMLdoc . PH.documentHTML Nothing Branding.visibleName
+getNoticeR = PH.toHTMLdoc . PH.documentHTMLNotice
 
 
 -- | Respond to button-press from displayed message.

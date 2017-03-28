@@ -15,7 +15,7 @@ If we ever have to support older browsers, <https://www.google.com.au/search?q=h
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module PresentHTML (toHTMLdoc, documentHTML, documentXHTML, gradeButtons, okButton) where
+module PresentHTML (toHTMLdoc, documentHTMLNotice, documentHTML, documentXHTML, gradeButtons, okButton) where
 
 
 import qualified Yesod.Core as YC
@@ -25,10 +25,15 @@ import qualified Text.XML as XML
 import qualified Text.Blaze.Html as BZH (toHtml)
 import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse)
+import qualified Branding (visibleName)
 
 
 toHTMLdoc :: XML.Document -> Foundation.Handler YC.Html
 toHTMLdoc = YC.liftIO . return . BZH.toHtml
+
+
+documentHTMLNotice :: DT.Text -> XML.Document
+documentHTMLNotice = documentHTML Nothing Branding.visibleName
 
 
 documentHTML :: Maybe DT.Text -> DT.Text -> DT.Text -> XML.Document
