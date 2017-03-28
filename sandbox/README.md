@@ -139,7 +139,7 @@ The source_serial value is a colon-separated list of:
 
 Then set up how we want to memorise the data.  We don't want to memorise all combinations.
 For example, in a school context, some pupils will be learning only French, some French and
-German etc.  We insert a view for each, which is somewhat analogous to a _card_ in Anki parlance.
+German etc.  We insert a _view_ for each, which is somewhat analogous to a _card_ in Anki parlance.
 
     INSERT INTO view (id, name, data_source_id, obverse, reverse, style_c_s_s) VALUES (1, 'econosphere', 1, 'What is the German for <field name="english"/>', '<frontSide/><hr/><field name="german"/>', 'font-family: Code2000;
     font-size:24pt;
@@ -150,7 +150,7 @@ German etc.  We insert a view for each, which is somewhat analogous to a _card_ 
     text-align: center;
     background-color: #00ff80;');
     
-That last column is obviously some CSS to apply to the questions and answers.   You can put it all on one line if you prefer.
+That last column is obviously some CSS to apply to the questions and answers.   Put it all on one line if you prefer.
 Omit or change the _font-family_ value if you don't have the Code2000 font.
 The obverse and reverse columns are strict XHTML.
 
@@ -174,7 +174,8 @@ http://192.168.1.113:3001 and you must of course specify the port number, if it'
 
 You should then be able to log in and immediately begin memorisation.  JackRose will want to give you all twenty items, one
 after the other so until the daily _throttle_ is implemented, you must just stop (logout) when you've had enough.  After that,
-the process is just as with any other SRS:  log in, do your repetitions, log out.
+the process is just as with any other SRS:  log in, do your repetitions, log out.  Score: 0 - clueless;  5 - eventually;  7 - normal
+and 9 - quick-fire.
 
 One difference that might surprise is that JackRose computes intervals in seconds, not days.  If you do your repetitions at
 one time each day, this will not affect you.  It does mean that if you log in again a second time on the same day,
