@@ -67,21 +67,20 @@ These are for the author's systems and the paths at least _will_ require tweakin
 
 The steps above get JackRose running.
 The first time you do this you will see a series of messages about creating and migrating tables.
-As JackRose is still alpha, it is necessary to configure it manually.
 
-* Connect to JackRose via a browser (e.g., http://192.168.1.113:3001).  A login screen should appear.
+Connect to JackRose via a browser (e.g., http://192.168.1.113:3001).  A login screen should appear.
 Create a new account.  If your email is configured correctly, you should receive a confirmation email
 with a link to click.  If it's not, the link appears in the log output so copy and paste it into your browser.
 If you can't for any reason, see below.
 
-* Stop JackRose (^C)
+Stop JackRose (^C)
 
 It is worth pointing-out that JackRose programmatically accesses two classes of data:
 1.  One or more _data sources_, containing the data which you wish to memorise, and which you must make known to JackRose.
 Generally these data are read-only to JackRose.  Most SRSs require that learning data be entered or imported into
 their own format.  JackRose only requires to be informed of those data, which (currently) can
 be in Postgres tables or views.
-2.  JackRoses own housekeeping data, which you created in the _migration_ step above.
+2.  JackRoses own housekeeping data, which it created in the _migration_ step above.
 
 First set up some data to memorise.  This example uses the numbers one to ten in various European languages.
 Set up a table in your choice of **Postgres** database:
@@ -118,7 +117,7 @@ the time being you must tell it manually by populating its configuration tables.
 
 Run your interactive database tool as user _jackrose_, connected to the server you configured as
 the _dataStore_ in _jackrose.conf_ above.  You can see yourself in the _users_ table.
-If you were unable click on the confirmation link for any reason, you can fix this now by setting the _verified_ field:
+If you were unable to click on the confirmation link for any reason, you can fix this now by setting the _verified_ field:
 
     update "User" set verified=True;
 
@@ -160,21 +159,21 @@ If you don't want to learn the (Attic) Greek numbers for example, omit the secon
     INSERT INTO user_deck_end (view_id, "user", parent, throttle, shuffle) VALUES (1, 1, NULL, NULL, NULL);
     INSERT INTO user_deck_end (view_id, "user", parent, throttle, shuffle) VALUES (2, 1, NULL, NULL, NULL);
 
-With this setup we are not using the German and Spanish columns but you can set up a view for them if you wish.
+With this setup we are not using the German and Spanish columns but you can set up views for them if you wish.
 
 Quit the interactive tool and start the JackRose server again.  This time you will see it print the rows from the _numbers_
 table as it adds them to its internal data.  Currently JackRose only scans the table for additions and deletions when you
 restart it but eventually there will be other means for telling it to resynchronise.  It only does this once;  if you restart JackRose
 again, it won't print the rows again.
 
-Finally, start the browser.  It goes without saying that the browser does not have to be on the same machine as
+Now start the browser.  It goes without saying that the browser does not have to be on the same machine as
 that on which the JackRose server is running.  The browser must understand the CSS _flex_ attribute.  Qupzilla and Firefox
 do.  Chrome and Chromium _should_.  Connect to the JackRose server.  In development here the URL is
 http://192.168.1.113:3001 and you must of course specify the port number, if it's other than the default 80.
 
 You should then be able to log in and immediately begin memorisation.  JackRose will want to give you all twenty items, one
 after the other so until the daily _throttle_ is implemented, you must just stop (logout) when you've had enough.  After that,
-the process is just as with any other SRS:  log in, do your repetitions, log out.  Score: 0 - clueless;  5 - eventually;  7 - normal
+the process is just as with any other SRS:  log in, do your repetitions, log out.  Score: 0 - clueless;  6 - eventually;  7 - normal
 and 9 - quick-fire.
 
 One difference that might surprise is that JackRose computes intervals in seconds, not days.  If you do your repetitions at
