@@ -85,7 +85,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 		extractConfNumItem = extractConfItem read
 
 		-- no point in opening a SQLite database more than once.
-		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem nameSql "tablesFile" (verbLabel, createSqlAnyPool)
+		(connLabels, connPoolM) = extractConfNumItem 1 "poolSize" $ extractConfTextItem nameSql "dataStore" (verbLabel, createSqlAnyPool)
 
 		-- we need verbosity early to control logging level
 		(verbLabel, verbosity) = extractConfItem logValue fallbackDebugLevel "verbosity" ([], id)
