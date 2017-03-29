@@ -43,7 +43,6 @@ executable JackRose
                       persistent-sqlite,
                       containers
   other-modules:      Application
-                      AuthoriStyle
                       Authorisation
                       Branding
                       CardExpand
@@ -107,7 +106,6 @@ executable AnkiConvert
                       time
   other-modules:
                       AnkiSchema
-                      AuthoriStyle
                       Authorisation
                       Branding
                       CommandArgs

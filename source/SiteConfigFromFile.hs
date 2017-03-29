@@ -19,7 +19,6 @@ import Data.List ((\\))
 import qualified CommandArgs (CmdLineArgs(..))
 import qualified Data.ConfigFile as DC
 import qualified Data.Maybe as DMy
-import qualified AuthoriStyle (Style(..))
 import qualified JRState (JRState(..), PostgresConnPool, DataSchemes, UserConfig)
 import qualified Data.Map as DM (empty)
 import Database.Persist.Sql (ConnectionPool)
@@ -62,14 +61,13 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 		makeAppObject :: ConnectionPool -> IO JRState.JRState
 		makeAppObject pool = spliceShared (almostAppObject pool) (DC.options configuration defaultSection)
 		almostAppObject pool =
-			extractConfItem authory AuthoriStyle.Email "trustedSite" $
-				extractConfTextItem DT.empty "appRoot" $
-					extractConfTextItem Branding.innerName "dbuser" $
-						extractConfItem id (DT.unpack Branding.innerName ++ ".aes") "keysFile" $
-							extractConfItem Just Nothing "portNumber" $
-								extractConfNumItem 120 "sessionMinutes" $
-									extractConfItem id False "shuffle" $
-										extractConfItem id True "secureSession" $ (connLabels, JRState.JRState verbosity pool)
+			extractConfTextItem DT.empty "appRoot" $
+				extractConfTextItem Branding.innerName "dbuser" $
+					extractConfItem id (DT.unpack Branding.innerName ++ ".aes") "keysFile" $
+						extractConfItem Just Nothing "portNumber" $
+							extractConfNumItem 120 "sessionMinutes" $
+								extractConfItem id False "shuffle" $
+									extractConfItem id True "secureSession" $ (connLabels, JRState.JRState verbosity pool)
 		-- create the site object and return it, logging information, warnings and errors as required.
 		spliceShared :: Show l => ([DT.Text], TVar JRState.PostgresConnPool -> TVar JRState.DataSchemes -> TVar JRState.UserConfig -> JRState.JRState) -> Either l [String] -> IO JRState.JRState
 		spliceShared (labels, fn) keysE = runFilteredLoggingT verbosity (either munchErr munchKeys keysE) >> return site where
@@ -118,11 +116,6 @@ initConfig = DC.emptyCP{DC.optionxform=id}
 
 errorInConfig :: Show a => (a, String) -> String
 errorInConfig (errData, location) = location ++ "###" ++ show errData
-
-
-authory :: Bool -> AuthoriStyle.Style
-authory False = AuthoriStyle.Trust
-authory True = AuthoriStyle.Email
 
 
 defaultSection :: String

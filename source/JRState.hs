@@ -12,7 +12,6 @@ module JRState where
 
 
 import Database.Persist.Sql (ConnectionPool)
-import AuthoriStyle (Style)
 import Authorisation (UserId)
 import Data.Text (Text)
 import UserDeck (UserDeckCpt)
@@ -57,8 +56,6 @@ data JRState = JRState {
 			-- ^ default account with which to open database source tables.
 		appRoot :: Text,
 			-- ^ needed for identification emails
-		howAuthorised :: Style,
-			-- ^ not sure and makes no sense now
 		postgresConnections :: TVar PostgresConnPool,
 			-- ^ all tables in a given database share a common PG ConnectionPool
 		dataSchemes :: TVar DataSchemes,
