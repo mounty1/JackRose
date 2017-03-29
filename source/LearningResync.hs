@@ -150,7 +150,7 @@ connection :: JRState.JRState -> [DT.Text] -> IO (Either DT.Text OpenDataSource)
 
 connection site [ "P", serverIP, maybePortNo, maybeDBase, dataTable, maybeUsername, maybePassw ] = catch (JRState.getPostgresConnPool site
 			>>= maybe (connectPostgreSQL connString >>= newConn) reuseConn . DM.lookup connectionParms
-			>>= pullStructure) sourceFail where
+			>>= pullStructure) (sourceFail connString) where
 
 	connString = "host=" ++ DT.unpack svr
 		++ maybe "" (makeLabel "port") (fmap (DT.pack . show) mbP)
@@ -200,12 +200,12 @@ connection _site [ "X", _ffileXML ] = return $ Left "XML not implemented yet"
 connection _ connStr = return $ Left $ DT.concat ("invalid connection string: " : connStr)
 
 
-sourceFail :: HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
-sourceFail = return . Left . DT.pack . show
+sourceFail :: String -> HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
+sourceFail connString sqlError = return $ Left $ DT.pack $ concat ["\"", connString, "\":", show sqlError]
 
 
 makeLabel :: String -> DT.Text -> String
-makeLabel label value = " " ++ label ++ "=\"" ++ DT.unpack value ++ "\""
+makeLabel label value = " " ++ label ++ "=" ++ DT.unpack value
 
 
 -- comma-separated list of primary key fieldsKey
