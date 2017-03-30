@@ -204,8 +204,8 @@ sourceFail :: String -> HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
 sourceFail connString sqlError = return $ Left $ DT.pack $ concat ["\"", connString, "\":", show sqlError]
 
 
-makeLabel :: String -> DT.Text -> String
-makeLabel label value = " " ++ label ++ "=" ++ DT.unpack value
+makeLabel :: DT.Text -> DT.Text -> String
+makeLabel label value = DT.unpack $ DT.concat [ " ", label, "=", value ]
 
 
 -- comma-separated list of primary key fieldsKey
