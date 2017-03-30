@@ -2,7 +2,7 @@ Spaced Repetition Software as a web service
 ===========================================
 
 Project status:  **alpha**.  You can run it if you are prepared to do some work.  In particular, you'll
-have to have a running Postgres server and be able run SQL insert statements.
+need a running Postgres server and will have to run SQL insert statements.
 
 [Building and running instructions](sandbox/README.md)
 
