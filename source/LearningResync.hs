@@ -23,7 +23,7 @@ import Control.Exception (catch)
 import Data.List (foldl', intersperse, (\\))
 import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable)
 import qualified Data.Map as DM (insert, adjust, lookup)
-import qualified Data.Text as DT (Text, concat, pack, unpack, null)
+import qualified Data.Text as DT (Text, concat, pack, unpack, empty, null)
 import qualified JRState (JRState(..), getPostgresConnPool, runFilteredLoggingT)
 import Database.Persist.Sql (SqlBackend, Entity(Entity), Key, runSqlPool, selectList, insertBy, fromSqlKey)
 import Database.Persist (replace)
@@ -153,10 +153,10 @@ connection site [ "P", serverIP, maybePortNo, maybeDBase, dataTable, maybeUserna
 			>>= pullStructure) (sourceFail connString) where
 
 	connString = "host=" ++ DT.unpack svr
-		++ maybe "" (makeLabel "port") (fmap (DT.pack . show) mbP)
-		++ maybe "" (makeLabel "dbname") mbD
+		++ maybeMakeLabel "port" (fmap (DT.pack . show) mbP)
+		++ maybeMakeLabel "dbname" mbD
 		++ " user=" ++ DT.unpack uName
-		++ maybe "" (makeLabel "password") mbW
+		++ maybeMakeLabel "password" mbW
 
 	connectionParms@(PostgresConnection svr mbP mbD uName mbW) = PostgresConnection
 			serverIP
@@ -204,8 +204,8 @@ sourceFail :: String -> HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
 sourceFail connString sqlError = return $ Left $ DT.pack $ concat ["\"", connString, "\":", show sqlError]
 
 
-makeLabel :: DT.Text -> DT.Text -> String
-makeLabel label value = DT.unpack $ DT.concat [ " ", label, "=", value ]
+maybeMakeLabel :: DT.Text -> Maybe DT.Text -> String
+maybeMakeLabel label = DT.unpack . maybe DT.empty (\value -> DT.concat [ " ", label, "=", value ])
 
 
 -- comma-separated list of primary key fieldsKey
