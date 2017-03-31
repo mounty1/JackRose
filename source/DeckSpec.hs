@@ -69,9 +69,9 @@ instance Y.MonadBaseControl IO ParsingResult where
 	restoreM = ParsingResult . restoreM
 
 
+content :: UserId -> JRState.JRState -> IO (Either DT.Text [UserDeck.UserDeckCpt])
 -- | Parse the users's configuration file.  This might fail (returning a @Left DT.Text@)
 -- or succeed (returning a @Right [UserDeck.UserDeckCpt]).
-content :: UserId -> JRState.JRState -> IO (Either DT.Text [UserDeck.UserDeckCpt])
 -- Currently, it does not in fact ever fail.  If its implementation changes, retrieve
 -- function failToParse from VC (2017.Feb.3).
 content userId site = JRState.runFilteredLoggingT site $ unwrapPR $ topDeck userId site

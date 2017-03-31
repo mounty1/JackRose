@@ -8,9 +8,6 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings #-}
-
-
 module CommandArgs (args, CmdLineArgs(..)) where
 
 
@@ -24,13 +21,13 @@ data CmdLineArgs = CmdLineArgs {
 	}
 
 
--- | get the raw command line arguments and populate a @CmdLineArgs@ instance
+-- | Get the raw command line arguments and populate a @CmdLineArgs@ instance
 -- with the data specified therein.
 args :: IO CmdLineArgs
 args = populate (CmdLineArgs Nothing False) `fmap` SE.getArgs
 
 
--- | take the head of what's left of the command line and change the @CmdLineArgs@
+-- Take the head of what's left of the command line and change the @CmdLineArgs@
 -- accordingly, then tail on to the rest of the arguments.
 populate :: CmdLineArgs -> [String] -> CmdLineArgs
 populate argsMap [] = argsMap
@@ -41,7 +38,7 @@ populate argsMap (('-': 'd' : more) : rest) = populate' argsMap' (('-' : more) :
 populate _ (other : _) = error $ other ++ ": out of place in arguments"
 
 
--- | sub-function for @populate@ that allows an empty "-" for when
+-- Sub-function for @populate@ that allows an empty "-" for when
 -- all options letters have been consumed.
 populate' :: CmdLineArgs -> [String] -> CmdLineArgs
 populate' argsMap ("-" : rest) = populate argsMap rest

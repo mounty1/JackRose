@@ -6,7 +6,7 @@ Maintainer: the project name, all lower case, at landcroft dot com
 Stability: experimental
 Portability: undefined
 
-It could be argued that we should use the Branding name here but favicon is 'well-known'
+It could be argued that we should use the 'Branding' name here but favicon is 'well-known'
 and expected in this context.
 -}
 

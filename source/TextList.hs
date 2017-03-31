@@ -21,7 +21,7 @@ enSerialise :: [DT.Text] -> DT.Text
 enSerialise = DT.concat . intersperse fs . map escapeText
 
 
--- | Reverse of @enserialise@.
+-- | Reverse of @enSerialise@.
 deSerialise :: DT.Text -> [DT.Text]
 deSerialise = map canonText . DT.splitOn fs
 

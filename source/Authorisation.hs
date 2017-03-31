@@ -44,7 +44,7 @@ mkUser :: DT.Text -> Y.Unique User
 mkUser = UniqueUsername
 
 
--- | list of real, verified users.
+-- | List of real, verified users.
 -- Unverified users are either real users who haven't yet verified their accounts, or, if they have no email,
 -- fake 'group' user accounts.
 userList :: forall (m :: * -> *). Y.MonadIO m => Control.Monad.Trans.Reader.ReaderT (Y.PersistEntityBackend User) m [UserId]

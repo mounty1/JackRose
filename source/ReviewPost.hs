@@ -21,7 +21,7 @@ import qualified Data.Text as DT (Text)
 import DespatchButtons (despatch)
 
 
--- | user has pressed a button; go on from there.
+-- | User has pressed a button; go on from there.
 postHomeR :: Foundation.Handler YC.Html
 postHomeR = YA.requireAuthId >> despatch Foundation.HomeR routeTable >>= YC.redirect
 

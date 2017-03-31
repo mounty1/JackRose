@@ -50,7 +50,7 @@ type PresentationParams = Either DT.Text (Entity LearnDatum, XML.Document)
 type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) => ReaderT SqlBackend m (Maybe PresentationParams)
 
 
--- | try to extract the login user name from the session; if present, verify that it's logged-in
+-- | Try to extract the login user name from the session; if present, verify that it's logged-in.
 getHomeR :: Foundation.Handler YC.Html
 getHomeR = YA.requireAuthId >>= getLoginR
 
@@ -77,7 +77,7 @@ digest acctName uid site userSchema =
 		>> YA.requireAuthId >>= review []
 
 
--- | show next item for review, for the logged-in user
+-- | Show next item for review, for the logged-in user.
 getReviewR :: DT.Text -> Foundation.Handler YC.Html
 getReviewR path = YA.requireAuthId >>= review (DL.filter (not . DT.null) (DT.split (== '/') path))
 

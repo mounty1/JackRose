@@ -31,9 +31,9 @@ import LogFilter (runFilteredLoggingT)
 import Control.Monad.Logger (LogLevel(..))
 
 
--- | Start here.
 main :: IO ()
--- | Turn the command line arguments into an easily-queried object,
+-- | Start here.
+-- Turn the command line arguments into an easily-queried object,
 -- use that to inform the construction of the foundation siteObject,
 -- then invoke the conversion.
 main = CommandArgs.args >>= siteObject >>= letsGo

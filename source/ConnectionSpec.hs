@@ -31,7 +31,7 @@ data DataHandle
 	| ExternalCached
 
 
--- | Pooled Postgres connection object;  see @JRState@ for usage.
+-- | Pooled Postgres connection object;  see 'JRState' for usage.
 data PostgresConnection = PostgresConnection {
 	serverName :: Text,
 	maybePort :: Maybe Int,

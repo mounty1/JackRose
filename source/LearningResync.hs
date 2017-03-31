@@ -47,7 +47,7 @@ import Data.Bifunctor (first)
 
 
 -- | Create handles or connections to all data sources;
--- then read them to be sure all records are known.
+-- then read them to be sure all rows are known.
 update :: JRState.JRState -> IO ()
 update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (JRState.tablesFile site)
 			-- convert the list of data-source rcords into a map of open connections

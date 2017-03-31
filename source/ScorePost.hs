@@ -32,7 +32,7 @@ import Control.Monad.Trans.Reader (ReaderT)
 import DespatchButtons (despatch)
 
 
--- | user has pressed a 'score' button; update database with new review and go to next item
+-- | User has pressed a /score/ button; update database with new review and go to next item.
 postScoreR :: Foundation.Handler YC.Html
 postScoreR = YA.requireAuthId >> despatch (const $ YC.redirect $ Foundation.AuthR YA.LogoutR) routeTable >>= \action -> SessionItemKey.get >>= action
 

@@ -19,6 +19,6 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Trans.Control (MonadBaseControl)
 
 
--- | run upgrade action on a database
+-- | Run the upgrade action on the pool.
 upgradeDB :: (MonadBaseControl IO m, MonadIO m) => PerstQ.ConnectionPool -> PerstQ.Migration -> m ()
 upgradeDB pool migration = PerstQ.runSqlPool (PerstQ.runMigration migration) pool

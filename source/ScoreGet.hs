@@ -37,7 +37,7 @@ import ExternalSQL (get)
 type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) => ReaderT SqlBackend m XML.Document
 
 
--- | Process OK button;  first extract item id. from session data
+-- | Process /OK/ button;  first extract item id. from session data
 getScoreR :: Foundation.Handler YC.Html
 getScoreR = YA.requireAuthId >> SessionItemKey.get >>= maybe goHome showAnswer
 

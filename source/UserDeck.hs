@@ -15,7 +15,7 @@ import Data.Text (Text)
 import LearningData (ViewId)
 
 
--- | An optional _throttle_ value to limit the daily quota of new items offered for memorisation.
+-- | An optional /throttle/ value to limit the daily quota of new items offered for memorisation.
 type NewThrottle = Maybe Int
 
 

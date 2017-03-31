@@ -88,12 +88,12 @@ okButton, gradeButtons :: [XML.Node]
 
 
 -- | "OK" button.
--- Label must be synchronised with text in ReviewPost.
+-- The label must be synchronised with text in 'ReviewPost'.
 okButton = [button1 "OK"]
 
 
 -- | Buttons 0 to 9 for scoring.
--- Label must be synchronised with text in ScorePost.
+-- The label must be synchronised with text in 'ScorePost'.
 gradeButtons = DL.intersperse oneSpace $ map gradeButton ['0' .. '9']
 
 

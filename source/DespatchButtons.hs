@@ -18,7 +18,7 @@ import qualified Data.Text as DT (Text)
 import Data.Maybe (listToMaybe, catMaybes, fromMaybe)
 
 
--- | User has pressed a button; look up associated action in table, or supply default
+-- | User has pressed a button; look up associated action in table, or supply default.
 despatch :: a -> [(DT.Text, DT.Text -> a)] -> Foundation.Handler a
 despatch deflRoute routeList = YA.requireAuthId >> (Y.runInputPost $ fmap (justOne deflRoute) $ sequenceA $ map blurb routeList)
 

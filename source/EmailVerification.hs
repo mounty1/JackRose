@@ -38,10 +38,10 @@ emailEnaction what uname email path = YH.waiRequest >>= \req -> maybe (YC.getYes
 
 newAccountEmail, resetAccountEmail :: (YC.MonadLogger m, YC.MonadHandler m, YC.HandlerSite m ~ JRState) => DT.Text -> DT.Text -> DT.Text -> m ()
 
--- | Send email containing verification link for a new account
+-- | Send email containing verification link for a new account.
 newAccountEmail = emailEnaction "Verification"
 
--- | Send email containing verification link for a password reset
+-- | Send email containing verification link for a password reset.
 resetAccountEmail = emailEnaction "Reset password"
 
 

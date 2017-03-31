@@ -36,7 +36,7 @@ nameSql = DT.append Branding.innerName ".sqlite"
 
 
 -- | Called once when the application starts;  it takes the command line parameters object and
--- constructs the Yesod foundation object, logging any warnings, errors and information.
+-- constructs the @Yesod@ foundation object, logging any warnings, errors and information.
 siteObject :: CommandArgs.CmdLineArgs -> IO JRState.JRState
 siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar DM.empty) >>= \s -> atomically (newTVar DM.empty) >>= configurationData r s where
 
