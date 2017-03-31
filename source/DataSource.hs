@@ -17,16 +17,16 @@ module DataSource (enSerialise) where
 
 
 import TextShow (showt)
-import qualified Data.Text as DT (Text, singleton, empty, null, head, length)
-import qualified TextList as DL (enSerialise, deSerialise)
+import qualified Data.Text as DT (Text, singleton, empty)
+import qualified TextList as DL (enSerialise)
 
 
 -- | All the details to identify a data source without actually opening a connection to it.
 data DataVariant
-	= Postgres { server :: DT.Text, port :: Maybe Int, database :: Maybe DT.Text, table :: DT.Text, username :: Maybe DT.Text, password :: Maybe DT.Text }
-	| Sqlite3 { tableName :: DT.Text }
-	| CSV { separator :: Char, fileCSV :: DT.Text }
-	| XMLSource { fileXML :: DT.Text }
+	= Postgres DT.Text (Maybe Int) (Maybe DT.Text) DT.Text (Maybe DT.Text) (Maybe DT.Text)
+	| Sqlite3 DT.Text
+	| CSV Char DT.Text
+	| XMLSource DT.Text
 
 
 showMI :: Maybe Int -> DT.Text
@@ -37,7 +37,7 @@ showMT :: Maybe DT.Text -> DT.Text
 showMT = maybe DT.empty id
 
 
--- TODO we don't need this;  replace with something that validates JSON input or similar.
+-- | TODO we don't need this;  replace with something that validates JSON input or similar.
 enSerialise :: DataVariant -> DT.Text
 enSerialise (Postgres serverIP portNo dbase dtable userName passWord) = DL.enSerialise [ "P", serverIP, showMI portNo, showMT dbase, dtable, showMT userName, showMT passWord ]
 enSerialise (Sqlite3 dtableName) = DL.enSerialise [ "Q", dtableName ]

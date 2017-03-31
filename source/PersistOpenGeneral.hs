@@ -27,6 +27,7 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Trans.Control (MonadBaseControl)
 
 
+-- | Create and return a back end pool of the type specified in the @connStr@ argument.
 createSqlAnyPool :: (MonadIO m, MonadLogger m, MonadBaseControl IO m) => DT.Text -> Int -> m ConnectionPool
 createSqlAnyPool connStr count = maybe
 		(createSqlitePool connStr count)

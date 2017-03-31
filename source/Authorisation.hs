@@ -9,6 +9,7 @@ Portability: undefined
 
 
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, MultiParamTypeClasses, GADTs, GeneralizedNewtypeDeriving, RankNTypes #-}
+{-# OPTIONS_HADDOCK prune #-}
 
 
 module Authorisation (migrateData, User(..), UserId, mkUser, userList) where
@@ -38,6 +39,7 @@ Member
 |]
 
 
+-- | Wrapper for unexportable @UniqueUsername@.
 mkUser :: DT.Text -> Y.Unique User
 mkUser = UniqueUsername
 

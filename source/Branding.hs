@@ -19,6 +19,8 @@ import qualified Data.Text as DT (Text, toLower)
 
 visibleName, innerName :: DT.Text
 
+-- | The product name to show to users.
 visibleName = "JackRose"
 
+-- | The 'product name' to use to form file-names etc.
 innerName = DT.toLower visibleName

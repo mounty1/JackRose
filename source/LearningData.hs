@@ -15,6 +15,7 @@ History:  record of item scores.
 
 
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving, RankNTypes, FlexibleInstances, DeriveGeneric #-}
+{-# OPTIONS_HADDOCK prune #-}
 
 
 module LearningData (migrateData,
@@ -109,14 +110,17 @@ nextItem :: Int8 -> [Y.Filter LearnDatum] -> UserId -> [Y.Key View] -> OneLearnP
 nextItem activityState extras user views = listToMaybe `fmap` selectList ((LearnDatumActivity ==. activityState) : (LearnDatumUser ==. user) : (LearnDatumViewUID <-. views) : extras) [ LimitTo 1 ]
 
 
+-- | Return the first new item for review, if there be one.
 newItem :: UserId -> [Y.Key View] -> OneLearnPersist
 newItem user views = nextItem 0 [] user views
 
 
+-- | Return the next item for review, if there be one.
 dueItem :: UserId -> UTCTime -> [Y.Key View] -> OneLearnPersist
 dueItem user stamp views = nextItem 2 [ LearnDatumNextReview <. stamp ] user views
 
 
+-- | All data rows referring to the given external data source.
 allSourceKeys :: Y.Key DataSource -> PersistResult [DT.Text]
 allSourceKeys dsId = map pickKey `fmap` (selectList [ DataRowDataSourceRowId ==. dsId ] [])
 
@@ -125,18 +129,23 @@ pickKey :: Y.Entity DataRow -> DT.Text
 pickKey (Y.Entity _ (DataRow key _ _)) = key
 
 
+-- | Replace the next-review time-stamp on a learn datum.
 updateTimeStamp :: forall (m :: * -> *). Y.MonadIO m => Y.Key LearnDatum -> UTCTime -> ReaderT SqlBackend m ()
 updateTimeStamp key time = update key [ LearnDatumNextReview =. time, LearnDatumActivity =. 2 ]
 
 
+-- | Wrap non-exportable @LearnItem@.
 mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Unique LearnDatum
 mkLearnDatumKey = LearnItem
 
 
+-- | Wrap non-exportable @LearnDatum@.
 mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> Int8 -> Double -> Double -> UTCTime -> LearnDatum
 mkLearnDatum = LearnDatum
 
 
+-- | Delete items that have been removed from the external data source,
+-- and all subordinate data.
 deleteItems :: forall (m :: * -> *). Y.MonadIO m => [DT.Text] -> ReaderT (Y.PersistEntityBackend DataRow) m [()]
 -- break up the deletion into chunks in order not to have too many variables in the SQL statement
 deleteItems deletees = sequence $ map (\portion -> deleteCascadeWhere [DataRowTableKey <-. portion]) $ split 10 deletees
@@ -147,5 +156,6 @@ viewsOnDataSource :: Y.Key DataSource -> PersistResult [Y.Key View]
 viewsOnDataSource sourceId = map entityKey `fmap` selectList [ ViewDataSourceId ==. sourceId ] []
 
 
+-- | Most recent history for the given learn datum
 lastHistory :: (Y.PersistQueryRead SqlBackend) => Int -> Y.Key LearnDatum ->PersistResult [History]
 lastHistory limit item = map entityVal `fmap` selectList [ HistoryItem ==. item ] [ Desc HistoryStamp, LimitTo limit ]

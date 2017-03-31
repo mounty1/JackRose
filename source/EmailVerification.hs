@@ -32,15 +32,16 @@ emailEnaction :: (YC.MonadLogger m, YC.MonadHandler m, YC.HandlerSite m ~ JRStat
 emailEnaction what uname email path = YH.waiRequest >>= \req -> maybe (YC.getYesod >>= enactSc) (\hostName -> enactRq (decodeUtf8 hostName) (WAI.isSecure req)) (WAI.requestHeaderHost req) where
 	enactRq serverHost isSecure = emailAction what uname email fullURL where
 		fullURL = DT.concat [if isSecure then "https" else "http", "://", serverHost, path]
-		-- DT.concat [appRoot site, maybe "" (DT.append ":" . showt) (portNumber site), path]
 	enactSc site = emailAction what uname email fullURL where
 		fullURL = DT.concat [appRoot site, maybe "" (DT.append ":" . showt) (portNumber site), path]
 
 
 newAccountEmail, resetAccountEmail :: (YC.MonadLogger m, YC.MonadHandler m, YC.HandlerSite m ~ JRState) => DT.Text -> DT.Text -> DT.Text -> m ()
 
+-- | Send email containing verification link for a new account
 newAccountEmail = emailEnaction "Verification"
 
+-- | Send email containing verification link for a password reset
 resetAccountEmail = emailEnaction "Reset password"
 
 

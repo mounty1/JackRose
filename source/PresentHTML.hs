@@ -28,18 +28,22 @@ import qualified Data.List as DL (intersperse)
 import qualified Branding (visibleName)
 
 
+-- | Convert an XHTML document into XML and lift it into the Handler Monad, so it can be displayed.
 toHTMLdoc :: XML.Document -> Foundation.Handler YC.Html
 toHTMLdoc = YC.liftIO . return . BZH.toHtml
 
 
+-- | Convert a string (representing a notice or information for the user) into a @Document@.
 documentHTMLNotice :: DT.Text -> XML.Document
 documentHTMLNotice = documentHTML Nothing Branding.visibleName
 
 
+-- | Compose a @Document@ with optional CSS and a title.
 documentHTML :: Maybe DT.Text -> DT.Text -> DT.Text -> XML.Document
 documentHTML styleCSS title content = documentXHTML styleCSS title okButton [makeNode "h1" centreAttr [XML.NodeContent content]]
 
 
+-- | Compose a @Document@ with optional CSS, bottom buttons and a title.
 documentXHTML :: Maybe DT.Text -> DT.Text -> [XML.Node] -> [XML.Node] -> XML.Document
 documentXHTML styleCSS title nextButton content = XML.Document
 		standardPrologue
@@ -74,6 +78,7 @@ documentXHTML styleCSS title nextButton content = XML.Document
 standardPrologue :: XML.Prologue
 standardPrologue =
 	XML.Prologue
+		-- TODO:  we ought to look at the encoding specified in the request.
 		[XML.MiscInstruction (XML.Instruction "xml" "version=\"1.0\" encoding=\"UTF-8\"")]
 		(Just $ XML.Doctype "html" Nothing)
 		[]
@@ -82,10 +87,13 @@ standardPrologue =
 okButton, gradeButtons :: [XML.Node]
 
 
--- label must be synchronised with text in ReviewPost
+-- | "OK" button.
+-- Label must be synchronised with text in ReviewPost.
 okButton = [button1 "OK"]
 
 
+-- | Buttons 0 to 9 for scoring.
+-- Label must be synchronised with text in ScorePost.
 gradeButtons = DL.intersperse oneSpace $ map gradeButton ['0' .. '9']
 
 

@@ -21,6 +21,8 @@ import qualified Text.XML as XML
 import GHC.Exception (SomeException)
 
 
+-- | Given a list of column names and value, convert the Text template to XML and substitute in
+-- parameter values.
 expand :: [DT.Text] -> Maybe DT.Text -> DT.Text -> [[Maybe String]] -> Either DT.Text [XML.Node]
 expand _ _ _ [] = Left "no data"
 expand cols maybeFront template [list] = if length cols /= length list then

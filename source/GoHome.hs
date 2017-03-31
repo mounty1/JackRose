@@ -15,5 +15,6 @@ import qualified Yesod.Core as YC
 import qualified Foundation
 
 
+-- | Redirect to Home page.
 goHome :: Foundation.Handler YC.Html
 goHome = YC.redirect Foundation.HomeR

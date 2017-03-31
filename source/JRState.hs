@@ -26,13 +26,18 @@ import LearningData (DataSourceId)
 import Database.HDBC.PostgreSQL (Connection)
 
 
+-- | All external data references to one server (various tables) share one connection object.
+-- This structure manages it.
 type PostgresConnPool = Map PostgresConnection (Int, Connection)
 
 
+-- | Each data source has a corresponding in-memory structure, corresponding
+-- to a file handle, database connection etc.
 type DataSchemes = Map DataSourceId DataDescriptor
 
 
--- the key of the map is Text because the security subsystem returns a user id.
+-- | The key of the map is Text because the security subsystem returns a user id, which is Text.
+-- TODO:  plumb Yesod.Auth to return a numeric id. instead.
 type UserConfig = Map Text (UserId, [UserDeckCpt])
 
 
@@ -65,17 +70,21 @@ data JRState = JRState {
 	}
 
 
+-- | Run logging at the user-specified level of detail.
 runFilteredLoggingT :: MonadIO m => JRState -> LoggingT m a -> m a
 runFilteredLoggingT site = LogFilter.runFilteredLoggingT (logLevel site)
 
 
+-- | Get the Postgres connection pool map
 getPostgresConnPool :: JRState -> IO PostgresConnPool
 getPostgresConnPool = readTVarIO . postgresConnections
 
 
+-- | Get the data source handle map
 getDataSchemes :: JRState -> IO DataSchemes
 getDataSchemes = readTVarIO . dataSchemes
 
 
+-- | Get the user configuration map
 getUserConfig :: JRState -> IO UserConfig
 getUserConfig = readTVarIO . userConfig

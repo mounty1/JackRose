@@ -15,5 +15,6 @@ import Control.Monad.Logger (LoggingT, filterLogger, LogLevel, runStdoutLoggingT
 import Control.Monad.IO.Class (MonadIO)
 
 
+-- | Logging to standard output.
 runFilteredLoggingT :: MonadIO m => LogLevel -> LoggingT m a -> m a
 runFilteredLoggingT level = runStdoutLoggingT . filterLogger (\_ -> (<=) level)

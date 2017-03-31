@@ -9,6 +9,7 @@ Portability: undefined
 
 
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, FlexibleInstances, TypeFamilies, MultiParamTypeClasses, ExistentialQuantification, GeneralizedNewtypeDeriving, DeriveGeneric #-}
+{-# OPTIONS_HADDOCK prune #-}
 
 
 module AnkiSchema where

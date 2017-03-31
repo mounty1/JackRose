@@ -19,6 +19,7 @@ import qualified Yesod.Auth as YA ()
 import qualified Yesod.Routes.TH.Types as YT
 
 
+-- | Routing table.
 routeData :: [YT.ResourceTree String]
 routeData = [YC.parseRoutes|
 	/ HomeR GET POST

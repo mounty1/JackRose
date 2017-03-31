@@ -15,6 +15,8 @@ import Data.Text (Text)
 import Database.HDBC.PostgreSQL (Connection)
 
 
+-- | In-memory representation of one external data source, with
+-- column names, which columns are the primary keys, and the open handle.
 data DataDescriptor = DataDescriptor {
 	columnNames :: [Text],
 	primaryKeys :: [Text],
@@ -22,12 +24,14 @@ data DataDescriptor = DataDescriptor {
 }
 
 
+-- | An open connection or handle to an external data source.
 data DataHandle
 	= Postgres Connection Text
-	| Sqlite3 { tableName :: Text }
+	| Sqlite3 Text
 	| ExternalCached
 
 
+-- | Pooled Postgres connection object;  see @JRState@ for usage.
 data PostgresConnection = PostgresConnection {
 	serverName :: Text,
 	maybePort :: Maybe Int,

@@ -13,6 +13,7 @@ module SplitList where
 
 split :: Int -> [a] -> [[a]]
 
+-- | Break a long list into sub-lists of the specified length.
 split _ [] = []
 
 split n ell = first : split n rest where

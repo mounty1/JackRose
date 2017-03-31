@@ -23,5 +23,6 @@ import Database.Persist.Sql (runSqlPool, Entity)
 import qualified Data.Text as DT (Text)
 
 
+-- | Given a user id., retrieve its persistent data.
 userToId :: forall (m :: * -> *). (MonadIO m, MonadBaseControl IO m) => JRState -> DT.Text -> m (Maybe (Entity User))
 userToId site user = runFilteredLoggingT site (runSqlPool (getBy $ mkUser user) (tablesFile site))

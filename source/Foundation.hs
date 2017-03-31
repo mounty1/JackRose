@@ -15,8 +15,8 @@ without @qualified@.
 
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, ViewPatterns #-}
-
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_HADDOCK prune #-}
 
 
 module Foundation where
@@ -37,7 +37,7 @@ import JRState (JRState(..))
 YC.mkYesodData "JRState" RouteData.routeData
 
 
--- This seems to be needed for older compilers;  ghc 8.0.2 can use 'Foundation.Route JRState' directly
+-- | This seems to be needed for older compilers;  ghc 8.0.2 can use 'Foundation.Route JRState' directly.
 type Destination = YC.Route JRState
 
 

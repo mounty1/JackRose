@@ -111,7 +111,7 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 	-- as above, this should not happen.
 	alreadyDatumHuh (Entity _ (LearnDatum vId _ _ _ _ _ _ _)) = alreadyRowPresent "learn datum" (showt $ fromSqlKey vId)
 
-	logKeyDelta label rowIds = sequence $ map (\rowId -> logInfoNS dataNameString $ DT.concat [dataSourceString, ": ", label, " \"", rowId, "\""]) rowIds
+	logKeyDelta label rowIds = sequence $ map (\rowId -> logInfoNS dataNameString $ DT.concat [dataSourceString, ": ", label, " \"", rowId, packedQuote]) rowIds
 
 	alreadyRowPresent label rowId = logErrorNS dataNameString (DT.concat [dataSourceString, ": ", label, " \"", rowId, "\" already exists"]) >> return []
 

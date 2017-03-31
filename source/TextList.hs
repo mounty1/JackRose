@@ -16,10 +16,12 @@ import Data.List (intersperse, foldl')
 import Data.Tuple (swap)
 
 
+-- | Losslessly encode a list of @Text@s as one @Text@.
 enSerialise :: [DT.Text] -> DT.Text
 enSerialise = DT.concat . intersperse fs . map escapeText
 
 
+-- | Reverse of @enserialise@.
 deSerialise :: DT.Text -> [DT.Text]
 deSerialise = map canonText . DT.splitOn fs
 

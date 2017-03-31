@@ -15,9 +15,11 @@ import Data.Text (Text)
 import LearningData (ViewId)
 
 
+-- | An optional _throttle_ value to limit the daily quota of new items offered for memorisation.
 type NewThrottle = Maybe Int
 
 
+-- | One node (terminal or not) in the hierarchy of views for each user.
 data UserDeckCpt =
 	SubDeck {
 		throttle :: NewThrottle,
