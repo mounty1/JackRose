@@ -50,7 +50,6 @@ executable JackRose
                       ConnectionSpec
                       DeckData
                       DeckSpec
-                      DataSource
                       DespatchButtons
                       EmailVerification
                       ExecuteSqlStmt
