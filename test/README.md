@@ -34,7 +34,7 @@ Postgres doesn't allow for global constants so the timeshift function is defined
 will produce a slightly different result each time.  Since the data set is small, this doesn't
 matter in practice.  Investigate psql constants (_-v_ command-line option).
 
-    $ psql -h services -U jackrose -d jr_ci -f setup.sql
+    $ psql -h services -U jackrose -d jr_ci -q -f setup.sql
 
 # Build the software
 
