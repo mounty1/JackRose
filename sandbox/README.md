@@ -1,4 +1,5 @@
-# RUNNING JACKROSE
+RUNNING JACKROSE
+===========================================
 
 The phases required are:
 

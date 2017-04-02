@@ -1,0 +1,735 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 9.4.4
+-- Dumped by pg_dump version 9.6.2
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'SQL_ASCII';
+SET standard_conforming_strings = on;
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
+--
+
+CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
+
+
+--
+-- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
+
+
+SET search_path = public, pg_catalog;
+
+--
+-- Name: timeshift(); Type: FUNCTION; Schema: public; Owner: jackrose
+--
+
+CREATE FUNCTION timeshift() RETURNS interval
+    LANGUAGE plpgsql
+    AS $$
+declare
+timedelta interval = now() - '2017-03-29 06:22:53.583945+00';
+begin
+return timedelta;
+end;
+$$;
+
+
+ALTER FUNCTION public.timeshift() OWNER TO jackrose;
+
+SET default_tablespace = '';
+
+SET default_with_oids = false;
+
+--
+-- Name: Member; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE "Member" (
+    id bigint NOT NULL,
+    child bigint NOT NULL,
+    parent bigint NOT NULL
+);
+
+
+ALTER TABLE "Member" OWNER TO jackrose;
+
+--
+-- Name: Member_id_seq; Type: SEQUENCE; Schema: public; Owner: jackrose
+--
+
+CREATE SEQUENCE "Member_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE "Member_id_seq" OWNER TO jackrose;
+
+--
+-- Name: Member_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: jackrose
+--
+
+ALTER SEQUENCE "Member_id_seq" OWNED BY "Member".id;
+
+
+--
+-- Name: User; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE "User" (
+    id bigint NOT NULL,
+    username character varying NOT NULL,
+    password bytea NOT NULL,
+    "emailAddress" character varying NOT NULL,
+    verified boolean NOT NULL,
+    "verifyKey" character varying NOT NULL,
+    "resetPasswordKey" character varying NOT NULL
+);
+
+
+ALTER TABLE "User" OWNER TO jackrose;
+
+--
+-- Name: User_id_seq; Type: SEQUENCE; Schema: public; Owner: jackrose
+--
+
+CREATE SEQUENCE "User_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE "User_id_seq" OWNER TO jackrose;
+
+--
+-- Name: User_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: jackrose
+--
+
+ALTER SEQUENCE "User_id_seq" OWNED BY "User".id;
+
+
+--
+-- Name: data_row; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE data_row (
+    id bigint NOT NULL,
+    table_key character varying NOT NULL,
+    data_source_row_id bigint NOT NULL,
+    loaded timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE data_row OWNER TO jackrose;
+
+--
+-- Name: data_row_id_seq; Type: SEQUENCE; Schema: public; Owner: jackrose
+--
+
+CREATE SEQUENCE data_row_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE data_row_id_seq OWNER TO jackrose;
+
+--
+-- Name: data_row_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: jackrose
+--
+
+ALTER SEQUENCE data_row_id_seq OWNED BY data_row.id;
+
+
+--
+-- Name: data_source; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE data_source (
+    id bigint NOT NULL,
+    accessor_write bigint NOT NULL,
+    accessor_read bigint NOT NULL,
+    name character varying NOT NULL,
+    source_serial character varying NOT NULL,
+    resynced timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE data_source OWNER TO jackrose;
+
+--
+-- Name: data_source_id_seq; Type: SEQUENCE; Schema: public; Owner: jackrose
+--
+
+CREATE SEQUENCE data_source_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE data_source_id_seq OWNER TO jackrose;
+
+--
+-- Name: data_source_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: jackrose
+--
+
+ALTER SEQUENCE data_source_id_seq OWNED BY data_source.id;
+
+
+--
+-- Name: history; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE history (
+    item bigint NOT NULL,
+    stamp timestamp with time zone NOT NULL,
+    grade integer NOT NULL
+);
+
+
+ALTER TABLE history OWNER TO jackrose;
+
+--
+-- Name: learn_datum; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE learn_datum (
+    id bigint NOT NULL,
+    view_u_i_d bigint NOT NULL,
+    item_id bigint NOT NULL,
+    "user" bigint NOT NULL,
+    activity integer NOT NULL,
+    space_algorithm integer NOT NULL,
+    factor1 double precision NOT NULL,
+    factor2 double precision NOT NULL,
+    next_review timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE learn_datum OWNER TO jackrose;
+
+--
+-- Name: learn_datum_id_seq; Type: SEQUENCE; Schema: public; Owner: jackrose
+--
+
+CREATE SEQUENCE learn_datum_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE learn_datum_id_seq OWNER TO jackrose;
+
+--
+-- Name: learn_datum_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: jackrose
+--
+
+ALTER SEQUENCE learn_datum_id_seq OWNED BY learn_datum.id;
+
+
+--
+-- Name: user_deck_end; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE user_deck_end (
+    view_id bigint NOT NULL,
+    "user" bigint NOT NULL,
+    parent bigint,
+    throttle bigint,
+    shuffle boolean
+);
+
+
+ALTER TABLE user_deck_end OWNER TO jackrose;
+
+--
+-- Name: user_deck_node; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE user_deck_node (
+    id bigint NOT NULL,
+    parent bigint,
+    "user" bigint NOT NULL,
+    throttle bigint,
+    shuffle boolean,
+    label character varying NOT NULL
+);
+
+
+ALTER TABLE user_deck_node OWNER TO jackrose;
+
+--
+-- Name: user_deck_node_id_seq; Type: SEQUENCE; Schema: public; Owner: jackrose
+--
+
+CREATE SEQUENCE user_deck_node_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE user_deck_node_id_seq OWNER TO jackrose;
+
+--
+-- Name: user_deck_node_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: jackrose
+--
+
+ALTER SEQUENCE user_deck_node_id_seq OWNED BY user_deck_node.id;
+
+
+--
+-- Name: view; Type: TABLE; Schema: public; Owner: jackrose
+--
+
+CREATE TABLE view (
+    id bigint NOT NULL,
+    name character varying NOT NULL,
+    data_source_id bigint NOT NULL,
+    obverse character varying NOT NULL,
+    reverse character varying NOT NULL,
+    style_c_s_s character varying
+);
+
+
+ALTER TABLE view OWNER TO jackrose;
+
+--
+-- Name: view_id_seq; Type: SEQUENCE; Schema: public; Owner: jackrose
+--
+
+CREATE SEQUENCE view_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE view_id_seq OWNER TO jackrose;
+
+--
+-- Name: view_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: jackrose
+--
+
+ALTER SEQUENCE view_id_seq OWNED BY view.id;
+
+
+--
+-- Name: Member id; Type: DEFAULT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY "Member" ALTER COLUMN id SET DEFAULT nextval('"Member_id_seq"'::regclass);
+
+
+--
+-- Name: User id; Type: DEFAULT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY "User" ALTER COLUMN id SET DEFAULT nextval('"User_id_seq"'::regclass);
+
+
+--
+-- Name: data_row id; Type: DEFAULT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY data_row ALTER COLUMN id SET DEFAULT nextval('data_row_id_seq'::regclass);
+
+
+--
+-- Name: data_source id; Type: DEFAULT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY data_source ALTER COLUMN id SET DEFAULT nextval('data_source_id_seq'::regclass);
+
+
+--
+-- Name: learn_datum id; Type: DEFAULT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY learn_datum ALTER COLUMN id SET DEFAULT nextval('learn_datum_id_seq'::regclass);
+
+
+--
+-- Name: user_deck_node id; Type: DEFAULT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY user_deck_node ALTER COLUMN id SET DEFAULT nextval('user_deck_node_id_seq'::regclass);
+
+
+--
+-- Name: view id; Type: DEFAULT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY view ALTER COLUMN id SET DEFAULT nextval('view_id_seq'::regclass);
+
+
+--
+-- Data for Name: Member; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY "Member" (id, child, parent) FROM stdin;
+\.
+
+
+--
+-- Name: Member_id_seq; Type: SEQUENCE SET; Schema: public; Owner: jackrose
+--
+
+SELECT pg_catalog.setval('"Member_id_seq"', 1, false);
+
+
+--
+-- Data for Name: User; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY "User" (id, username, password, "emailAddress", verified, "verifyKey", "resetPasswordKey") FROM stdin;
+1	mounty	\\x7368613235367c31327c572f77634a66345a59742b475768767a324541586b673d3d7c4e7a4d6f50494d45556d45685a336b316b70637750796b6d6c51794c596e6a4d6c4d73495a6c43735275453d	gate03@landcroft.com	t		
+\.
+
+
+--
+-- Name: User_id_seq; Type: SEQUENCE SET; Schema: public; Owner: jackrose
+--
+
+SELECT pg_catalog.setval('"User_id_seq"', 1, true);
+
+
+--
+-- Data for Name: data_row; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY data_row (id, table_key, data_source_row_id, loaded) FROM stdin;
+4	1	1	2017-03-29 06:22:53.583945+00
+5	2	1	2017-03-29 06:22:53.583945+00
+6	3	1	2017-03-29 06:22:53.583945+00
+7	4	1	2017-03-29 06:22:53.583945+00
+8	5	1	2017-03-29 06:22:53.583945+00
+9	6	1	2017-03-29 06:22:53.583945+00
+10	7	1	2017-03-29 06:22:53.583945+00
+11	8	1	2017-03-29 06:22:53.583945+00
+12	9	1	2017-03-29 06:22:53.583945+00
+13	10	1	2017-03-29 06:22:53.583945+00
+\.
+
+
+--
+-- Name: data_row_id_seq; Type: SEQUENCE SET; Schema: public; Owner: jackrose
+--
+
+SELECT pg_catalog.setval('data_row_id_seq', 13, true);
+
+
+--
+-- Data for Name: data_source; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY data_source (id, accessor_write, accessor_read, name, source_serial, resynced) FROM stdin;
+1	0	0	nouns	P:services::mounty:numbers:jackrose:test	2017-03-29 06:22:53.583945+00
+\.
+
+
+--
+-- Name: data_source_id_seq; Type: SEQUENCE SET; Schema: public; Owner: jackrose
+--
+
+SELECT pg_catalog.setval('data_source_id_seq', 1, false);
+
+
+--
+-- Data for Name: history; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY history (item, stamp, grade) FROM stdin;
+4	2017-03-31 03:46:13.562729+00	98
+6	2017-03-31 03:46:17.219053+00	98
+8	2017-03-31 03:46:20.908548+00	98
+10	2017-03-31 03:46:24.347422+00	98
+12	2017-03-31 03:46:27.802672+00	98
+4	2017-04-01 05:30:32.688472+00	112
+6	2017-04-01 05:30:36.225472+00	98
+8	2017-04-01 05:30:43.170336+00	42
+\.
+
+
+--
+-- Data for Name: learn_datum; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY learn_datum (id, view_u_i_d, item_id, "user", activity, space_algorithm, factor1, factor2, next_review) FROM stdin;
+5	2	4	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+7	2	5	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+9	2	6	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+11	2	7	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+13	2	8	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+14	1	9	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+15	2	9	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+16	1	10	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+17	2	10	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+18	1	11	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+19	2	11	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+20	1	12	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+21	2	12	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+22	1	13	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+23	2	13	1	0	1	0.299999999999999989	86400	2017-03-29 06:22:53.583945+00
+10	1	7	1	2	1	0.299999999999999989	86400	2017-04-01 03:46:24.347422+00
+12	1	8	1	2	1	0.299999999999999989	86400	2017-04-01 03:46:27.802672+00
+4	1	4	1	2	1	0.299999999999999989	86400	2017-04-02 05:30:32.688472+00
+6	1	5	1	2	1	0.299999999999999989	86400	2017-04-02 05:30:36.225472+00
+8	1	6	1	2	1	0.299999999999999989	86400	2017-04-01 05:30:44.170336+00
+\.
+
+
+--
+-- Name: learn_datum_id_seq; Type: SEQUENCE SET; Schema: public; Owner: jackrose
+--
+
+SELECT pg_catalog.setval('learn_datum_id_seq', 23, true);
+
+
+--
+-- Data for Name: user_deck_end; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY user_deck_end (view_id, "user", parent, throttle, shuffle) FROM stdin;
+1	1	\N	\N	\N
+2	1	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: user_deck_node; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY user_deck_node (id, parent, "user", throttle, shuffle, label) FROM stdin;
+\.
+
+
+--
+-- Name: user_deck_node_id_seq; Type: SEQUENCE SET; Schema: public; Owner: jackrose
+--
+
+SELECT pg_catalog.setval('user_deck_node_id_seq', 1, false);
+
+
+--
+-- Data for Name: view; Type: TABLE DATA; Schema: public; Owner: jackrose
+--
+
+COPY view (id, name, data_source_id, obverse, reverse, style_c_s_s) FROM stdin;
+1	econosphere	1	What is the German for <field name="english"/>	<frontSide/><hr/><field name="german"/>	font-family: Code2000;\nfont-size:24pt;\nbackground-color: #00ff80;\ntext-align: center;
+2	engtogreek	1	What is the Greek for <field name="english"/>	<frontSide/><hr/><field name="greek"/>	font-family: Code2000;\nfont-size:24pt;\ntext-align: center;\nbackground-color: #00ff80;
+\.
+
+
+--
+-- Name: view_id_seq; Type: SEQUENCE SET; Schema: public; Owner: jackrose
+--
+
+SELECT pg_catalog.setval('view_id_seq', 1, false);
+
+
+--
+-- Name: Member Member_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY "Member"
+    ADD CONSTRAINT "Member_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: User UniqueUsername; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY "User"
+    ADD CONSTRAINT "UniqueUsername" UNIQUE (username);
+
+
+--
+-- Name: User User_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY "User"
+    ADD CONSTRAINT "User_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: data_row data_row_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY data_row
+    ADD CONSTRAINT data_row_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: data_source data_source_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY data_source
+    ADD CONSTRAINT data_source_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: history history_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY history
+    ADD CONSTRAINT history_pkey PRIMARY KEY (item, stamp);
+
+
+--
+-- Name: learn_datum learn_datum_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY learn_datum
+    ADD CONSTRAINT learn_datum_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: learn_datum learn_item; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY learn_datum
+    ADD CONSTRAINT learn_item UNIQUE (view_u_i_d, item_id, "user");
+
+
+--
+-- Name: data_row unique_row; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY data_row
+    ADD CONSTRAINT unique_row UNIQUE (table_key, data_source_row_id);
+
+
+--
+-- Name: user_deck_end user_deck_end_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY user_deck_end
+    ADD CONSTRAINT user_deck_end_pkey PRIMARY KEY (view_id, "user");
+
+
+--
+-- Name: user_deck_node user_deck_node_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY user_deck_node
+    ADD CONSTRAINT user_deck_node_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: view view_pkey; Type: CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY view
+    ADD CONSTRAINT view_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: Member Member_child_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY "Member"
+    ADD CONSTRAINT "Member_child_fkey" FOREIGN KEY (child) REFERENCES "User"(id);
+
+
+--
+-- Name: Member Member_parent_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY "Member"
+    ADD CONSTRAINT "Member_parent_fkey" FOREIGN KEY (parent) REFERENCES "User"(id);
+
+
+--
+-- Name: data_row data_row_data_source_row_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY data_row
+    ADD CONSTRAINT data_row_data_source_row_id_fkey FOREIGN KEY (data_source_row_id) REFERENCES data_source(id);
+
+
+--
+-- Name: history history_item_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY history
+    ADD CONSTRAINT history_item_fkey FOREIGN KEY (item) REFERENCES learn_datum(id);
+
+
+--
+-- Name: learn_datum learn_datum_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY learn_datum
+    ADD CONSTRAINT learn_datum_item_id_fkey FOREIGN KEY (item_id) REFERENCES data_row(id);
+
+
+--
+-- Name: learn_datum learn_datum_view_u_i_d_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY learn_datum
+    ADD CONSTRAINT learn_datum_view_u_i_d_fkey FOREIGN KEY (view_u_i_d) REFERENCES view(id);
+
+
+--
+-- Name: user_deck_end user_deck_end_parent_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY user_deck_end
+    ADD CONSTRAINT user_deck_end_parent_fkey FOREIGN KEY (parent) REFERENCES user_deck_node(id);
+
+
+--
+-- Name: user_deck_node user_deck_node_parent_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY user_deck_node
+    ADD CONSTRAINT user_deck_node_parent_fkey FOREIGN KEY (parent) REFERENCES user_deck_node(id);
+
+
+--
+-- Name: view view_data_source_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jackrose
+--
+
+ALTER TABLE ONLY view
+    ADD CONSTRAINT view_data_source_id_fkey FOREIGN KEY (data_source_id) REFERENCES data_source(id);
+
+
+--
+-- Name: public; Type: ACL; Schema: -; Owner: postgres
+--
+
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM postgres;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO PUBLIC;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
