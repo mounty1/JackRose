@@ -46,9 +46,6 @@ You will need an interactive tool (psql or sqlitebrowser) for your chosen back-e
 For Postgres, the dataStore value must be of the form _dbi:Pg:arg=value[;...]_
 For SQLite, it is just a file name.
 If you choose Postgres, you must create a matching database, user and password.
-
-    $ cd source
-
 Then proceed according to your platform, below.
 
 ## PER-PLATFORM BUILD NOTES
@@ -56,13 +53,13 @@ Then proceed according to your platform, below.
 These are for the author's systems and the paths at least _will_ require tweaking for other situations.
 
 ### CentOS 7 + stack
-    $ stack build --verbosity warn --allow-different-user --install-ghc --haddock && (cd ../sandbox;../source/.stack-work/install/x86_64-linux/lts-7.0/8.0.1/bin/JackRose -c ./jackrose.conf)
+    $ cd source ; stack build --verbosity warn --allow-different-user --install-ghc --haddock && (cd ../sandbox;../source/.stack-work/install/x86_64-linux/lts-7.0/8.0.1/bin/JackRose -c ./jackrose.conf)
 
 ### NixOS + Nix
-    $ cabal2nix . >default.nix && nix-build JackRose.nix && (cd ../sandbox;/nix/store/wnpz8zwvmk96ad07190caqwgv2mhbqjs-JackRose-0.8/bin/JackRose -c jackrose.conf)
+    $ cd test ; cabal2nix ../source >default.nix && nix-build JackRose.nix && (cd ../sandbox;/nix/store/wnpz8zwvmk96ad07190caqwgv2mhbqjs-JackRose-0.8/bin/JackRose -c jackrose.conf)
 
 ### Gentoo + cabal
-    $ cabal sandbox init && cabal install && (cd ../sandbox/;../source/.cabal-sandbox/bin/JackRose -c jackrose.conf)
+    $ cd source ; cabal sandbox init && cabal install && (cd ../sandbox/;../source/.cabal-sandbox/bin/JackRose -c jackrose.conf)
 
 ## Running JackRose
 
