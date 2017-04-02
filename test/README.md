@@ -3,7 +3,7 @@ Continuous Integration (CI) Testing
 
 This is a WIP.  Incomplete.  Don't use it yet.
 
-Integration / release testing is based on Hydra running on NixOS.
+Integration / release testing is based on [Hydra](https://nixos.org/hydra) running on [NixOS](https://nixos.org).
 
 To run the test-suite without user interaction, you must creat a Postgres database called *jr_ci*
 and configure it for passwordless access.  These instructions are for:
@@ -26,22 +26,16 @@ Supply password so that CI is not interactive.
 
 # Prepare JackRoses own data
 
-Load the data.
-
-    $ psql -h services -U jackrose -d jr_ci -f dump.text
-
-Apply time offset.  Obviously, the base data were produced at some instant, but time
-never stops, and we want to run the test as though the data were current.  One way would
-be for JackRose to take a 'time offset' parameter but that would make testing different from
-normal usage so we adjust all time-stamps to make the base data as-of the present.
+Load the data and apply time offset.  Obviously, the base data were produced at some instant,
+but time never stops, and we want to run the test as though the data were current.  One way
+would be for JackRose to take a 'time offset' parameter but that would make testing different
+from normal usage so we adjust all time-stamps to make the base data as-of the present.
 Postgres doesn't allow for global constants so the timeshift function is defined but this
 will produce a slightly different result each time.  Since the data set is small, this doesn't
 matter in practice.  Investigate psql constants (_-v_ command-line option).
 
-    update data_row set loaded = loaded + timeshift();
-    update data_source set resynced = resynced + timeshift();
-    update history set stamp = stamp + timeshift();
-    update learn_datum set next_review = next_review + timeshift();
+    $ psql -h services -U jackrose -d jr_ci -f dump.text
+    $ psql -h services -U jackrose -d jr_ci -f timeshift.text
 
 # Build the software
 
