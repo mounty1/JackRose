@@ -23,13 +23,14 @@ In _psql_:
 Supply password so that CI is not interactive.
 
     $ echo services:'*':jr_ci:jackrose:test >$HOME/.pgpass
+    $ chmod 0400 $HOME/.pgpass
 
 # Prepare JackRoses own data
 
 Load the data and apply time offset.  Obviously, the base data were produced at some instant,
 but time never stops, and we want to run the test as though the data were current.  One way
 would be for JackRose to take a 'time offset' parameter but that would make testing different
-from normal usage so we adjust all time-stamps to make the base data as-of the present.
+from normal usage so we adjust all time-stamps to make the base-data as-of the present.
 Postgres doesn't allow for global constants so the timeshift function is defined but this
 will produce a slightly different result each time.  Since the data set is small, this doesn't
 matter in practice.  Investigate psql constants (_-v_ command-line option).
