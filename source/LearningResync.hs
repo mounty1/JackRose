@@ -27,8 +27,8 @@ import qualified Data.Text as DT (Text, concat, pack, unpack, empty, null)
 import qualified JRState (JRState(..), getPostgresConnPool, runFilteredLoggingT)
 import Database.Persist.Sql (SqlBackend, Entity(Entity), Key, runSqlPool, selectList, insertBy, fromSqlKey)
 import Database.Persist (replace)
-import TextList (enSerialise)
-import Data.Maybe (catMaybes)
+import TextList (enSerialise, deSerialise)
+import Data.Maybe (mapMaybe)
 import LearningData (DataSource(..), DataRow(..), DataSourceId, LearnDatum(..), mkLearnDatum, ViewId, deleteItems, allSourceKeys, viewsOnDataSource)
 import Database.HDBC.PostgreSQL (connectPostgreSQL)
 import Control.Monad.IO.Class (liftIO)
@@ -37,7 +37,6 @@ import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar (modifyTVar')
 import ConnectionSpec (DataDescriptor(..), DataHandle(..), PostgresConnection(..))
 import MaybeIntValue (maybeIntValue)
-import TextList (deSerialise)
 import DeckData (userDeckEndsViewed, userDeckEndViewId, UserDeckEnd)
 import Authorisation (UserId, userList)
 import Control.Monad.Trans.Reader (ReaderT)
@@ -57,7 +56,7 @@ update site = JRState.runFilteredLoggingT site $ runSqlPool (selectList [] []) (
 			-- The code above returns a list of (key, descriptor) pairs
 			-- The code below folds them into the TVar set, which in the current implementation
 			-- will be empty because this code is being evaluated at start-up time.
-			>>= liftIO . atomically . modifyTVar' (JRState.dataSchemes site) . (flip $ foldr $ uncurry DM.insert)
+			>>= liftIO . atomically . modifyTVar' (JRState.dataSchemes site) . flip (foldr $ uncurry DM.insert)
 
 
 type DataSchemes = LoggingT IO [(DataSourceId, DataDescriptor)]
@@ -91,7 +90,7 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 		>> logKeyDelta "adding" newItems
 		>> viewsOnDataSource dataSourceId
 		>>= expandViewList
-		>>= \userViewPairs -> (fmap concat $ sequence $ map (insertDataRow userViewPairs timeStamp) newItems)
+		>>= \userViewPairs -> concat <$> mapM (insertDataRow userViewPairs timeStamp) newItems
 
 	-- insert new data row, then if successful, new learn datum for all valid combinations of (user, view)
 	insertDataRow :: [(UserId, ViewId)] -> UTCTime -> DT.Text -> RowResult (Key LearnDatum)
@@ -102,7 +101,7 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 
 	-- data row inserted, so insert new learn data.
 	insertLearnData :: [(UserId, ViewId)] -> UTCTime -> Key DataRow -> RowResult (Key LearnDatum)
-	insertLearnData userViewPairs timeStamp rowId = fmap concat $ sequence $ map (insertLearnDatum timeStamp rowId) userViewPairs
+	insertLearnData userViewPairs timeStamp rowId = concat <$> mapM (insertLearnDatum timeStamp rowId) userViewPairs
 
 	-- insert one learn datum;  (return . return) makes a RowResult from a LearnDatum
 	insertLearnDatum :: UTCTime -> Key DataRow -> (UserId, ViewId) -> RowResult (Key LearnDatum)
@@ -111,7 +110,7 @@ updateOneSource site schemeMap (Entity dataSourceId dataSourceParts) = liftIO (c
 	-- as above, this should not happen.
 	alreadyDatumHuh (Entity _ (LearnDatum vId _ _ _ _ _ _ _)) = alreadyRowPresent "learn datum" (showt $ fromSqlKey vId)
 
-	logKeyDelta label rowIds = sequence $ map (\rowId -> logInfoNS dataNameString $ DT.concat [dataSourceString, ": ", label, " \"", rowId, packedQuote]) rowIds
+	logKeyDelta label = mapM (\rowId -> logInfoNS dataNameString $ DT.concat [dataSourceString, ": ", label, " \"", rowId, packedQuote])
 
 	alreadyRowPresent label rowId = logErrorNS dataNameString (DT.concat [dataSourceString, ": ", label, " \"", rowId, "\" already exists"]) >> return []
 
@@ -127,7 +126,7 @@ partitionInsertResults sourceDataKeysList dataRowsAlready = (dataRowsAlready \\ 
 
 
 expandViewList :: [ViewId] -> RowResult (UserId, ViewId)
-expandViewList viewList = userList >>= fmap concat . sequence . map (thisViewByUser viewList)
+expandViewList viewList = userList >>= fmap concat . mapM (thisViewByUser viewList)
 
 
 thisViewByUser :: [ViewId] -> UserId -> RowResult (UserId, ViewId)
@@ -176,16 +175,13 @@ connection site [ "P", serverIP, maybePortNo, maybeDBase, dataTable, maybeUserna
 
 	pullStructure conn = HDBC.describeTable conn tableNameStr >>= mashIntoFields conn
 
-	mashIntoFields conn rows = exeStmt conn primyKeyQuery []
-		>>= return . maybe [] (map DT.pack) . sequence . map head
+	mashIntoFields conn rows = fmap (maybe [] (map DT.pack) . mapM head) (exeStmt conn primyKeyQuery [])
 		>>= kazam conn rows
 
-	kazam conn rows primaryKey = exeStmt conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" ORDER BY " ++ keysList ++ ";") []
-		-- extract primary key value from row as [[Maybe String]] and convert to [DataRow]
-		-- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
-		>>= return . map (enSerialise . map DT.pack) . catMaybes . map sequence
-		>>= return . Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey where
-			keysList = primyKeysForQ primaryKey
+	kazam conn rows primaryKey = fmap
+		(Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey . mashHeads)
+		(exeStmt conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" ORDER BY " ++ keysList ++ ";") []) where
+		keysList = primyKeysForQ primaryKey
 
 	primyKeyQuery = "SELECT \"attname\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass AND i.indisprimary ORDER BY a.attnum;"
 
@@ -198,6 +194,12 @@ connection _site [ "C", _recseparator, _ffileCSV ] = return $ Left "CSV not impl
 connection _site [ "X", _ffileXML ] = return $ Left "XML not implemented yet"
 
 connection _ connStr = return $ Left $ DT.concat ("invalid connection string: " : connStr)
+
+
+-- Extract primary key value from row.
+-- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
+mashHeads :: [[Maybe String]] -> [DT.Text]
+mashHeads = map (enSerialise . map DT.pack) . mapMaybe sequence
 
 
 sourceFail :: String -> HDBC.SqlError -> IO (Either DT.Text OpenDataSource)

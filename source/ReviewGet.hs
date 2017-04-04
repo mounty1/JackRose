@@ -8,7 +8,7 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, RankNTypes, KindSignatures #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, RankNTypes #-}
 
 
 module ReviewGet (getHomeR, getReviewR) where
@@ -61,7 +61,7 @@ getLoginR :: DT.Text -> Foundation.Handler YC.Html
 getLoginR acctName = YC.getYesod >>= checkAlreadyLoggedIn acctName
 
 
-checkAlreadyLoggedIn :: DT.Text  -> JRState.JRState -> Foundation.Handler YC.Html
+checkAlreadyLoggedIn :: DT.Text -> JRState.JRState -> Foundation.Handler YC.Html
 checkAlreadyLoggedIn acctName site = YC.liftIO (JRState.getUserConfig site) >>= maybe (verifyUser acctName site) (descendToDeckRoot site Nothing [] []) . DM.lookup acctName
 
 
@@ -73,7 +73,7 @@ verifyUser acctName site =YC.liftIO (userToId site acctName) >>= maybe
 
 digest :: DT.Text -> Authorisation.UserId -> JRState.JRState -> [UserDeck.UserDeckCpt] -> Foundation.Handler YC.Html
 digest acctName uid site userSchema =
-		(YC.liftIO $ atomically $ modifyTVar' (JRState.userConfig site) (DM.insert acctName (uid, userSchema)))
+		YC.liftIO (atomically $ modifyTVar' (JRState.userConfig site) (DM.insert acctName (uid, userSchema)))
 		>> YA.requireAuthId >>= review []
 
 
@@ -84,7 +84,7 @@ getReviewR path = YA.requireAuthId >>= review (DL.filter (not . DT.null) (DT.spl
 
 review :: [DT.Text] -> DT.Text -> Foundation.Handler YC.Html
 review deckPath {- e.g., ["Language", "Alphabets", "Arabic"] -} username = YC.getYesod >>= zappo where
-		zappo site = (YC.liftIO $ JRState.getUserConfig site) >>=
+		zappo site = YC.liftIO (JRState.getUserConfig site) >>=
 			maybe (FailureMessage.page $ DT.concat ["user \"", username, "\" dropped from state"]) (descendToDeckRoot site Nothing deckPath []) . DM.lookup username
 
 
@@ -124,7 +124,7 @@ tableList (UserDeck.SubDeck _ _ _ dex) = concatMap tableList dex
 
 
 searchForNew ::JRState.JRState -> UserId -> UserDeck.NewThrottle -> [ViewId] -> [DT.Text] -> Foundation.Handler (Maybe PresentationParams)
-searchForNew site userId throttle views deckDrilled = runItemQuery site (newItem userId views) deckDrilled
+searchForNew site userId throttle views = runItemQuery site (newItem userId views)
 
 
 runItemQuery :: (YC.MonadIO m, YC.MonadBaseControl IO m) => JRState.JRState -> SqlPersistT (LoggingT m) (Maybe (Entity LearnDatum)) -> [DT.Text] -> m (Maybe PresentationParams)
@@ -149,12 +149,12 @@ noSomething :: (ToBackendKey SqlBackend record) => DT.Text -> Key record -> Lear
 noSomething label item = YC.liftIO $ return $ Just $ Left $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
 
 
-readFromSource :: Entity LearnDatum -> DT.Text -> [DT.Text] -> DataDescriptor ->  LearningData.View -> LearnItemParameters
+readFromSource :: Entity LearnDatum -> DT.Text -> [DT.Text] -> DataDescriptor -> LearningData.View -> LearnItemParameters
 readFromSource item key deckDrilled (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse _ style) =
-	YC.liftIO $
-		ExternalSQL.get key keys1y handle
+	YC.liftIO $ fmap
+			(Just . fmap ((,) item . PH.documentXHTML style (DT.concat $ DL.intersperse "/" (if null deckDrilled then [] else reverse deckDrilled ++ [":"]) ++ [viewName]) PH.okButton) . CardExpand.expand cols Nothing obverse)
+			(ExternalSQL.get key keys1y handle)
 			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
-			>>= return . Just . fmap (((,) item) . PH.documentXHTML style (DT.concat $ DL.intersperse "/" (if null deckDrilled then [] else reverse deckDrilled ++ [":"]) ++ [viewName]) PH.okButton) . CardExpand.expand cols Nothing obverse
 
 
 -- put the necessary data into the session so that the POST knows what to add or update.

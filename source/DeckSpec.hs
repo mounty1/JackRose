@@ -43,7 +43,7 @@ unwrapPR (ParsingResult value) = value
 
 instance Applicative ParsingResult where
 	pure = ParsingResult . return . Right
-	ParsingResult a <*> ParsingResult b = ParsingResult $ a >>= (\f -> b >>= return . (<*>) f)
+	ParsingResult a <*> ParsingResult b = ParsingResult $ a >>= (\f -> fmap (f <*>) b)
 
 
 instance Monad ParsingResult where
@@ -79,8 +79,7 @@ content userId site = JRState.runFilteredLoggingT site $ unwrapPR $ topDeck user
 
 topDeck :: UserId -> JRState.JRState -> ParsingResult [UserDeck.UserDeckCpt]
 topDeck uid site = DPQ.runSqlPool (DD.userDeckEnds uid) (JRState.tablesFile site) >>=
-		\terminals -> DPQ.runSqlPool (DD.userDeckNodes uid) (JRState.tablesFile site) >>=
-			return . levelFilter isNothing (JRState.shuffleCards site) terminals
+		\terminals -> levelFilter isNothing (JRState.shuffleCards site) terminals `fmap` DPQ.runSqlPool (DD.userDeckNodes uid) (JRState.tablesFile site)
 
 
 levelFilter :: (Maybe DD.UserDeckNodeId -> Bool) -> Bool -> [DPQ.Entity DD.UserDeckEnd] -> [DPQ.Entity DD.UserDeckNode] -> [UserDeck.UserDeckCpt]
@@ -102,5 +101,5 @@ fromNode shuffleDeck terminals nodes (DPQ.Entity nodeId node) = UserDeck.SubDeck
 		(DD.userDeckNodeThrottle node)
 		shufflety
 		(DD.userDeckNodeLabel node)
-		(levelFilter (maybe False ((==) nodeId)) shufflety terminals nodes) where
+		(levelFilter (maybe False (nodeId ==)) shufflety terminals nodes) where
 			shufflety = fromMaybe shuffleDeck $ DD.userDeckNodeShuffle node

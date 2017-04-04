@@ -10,7 +10,7 @@ Portability: undefined
 module ExternalSQL (get) where
 
 
-import qualified Data.List as DL (intersperse, concat)
+import qualified Data.List as DL (intercalate)
 import TextList (deSerialise)
 import ExecuteSqlStmt (exeStmt)
 import ConnectionSpec (DataHandle(..))
@@ -23,5 +23,4 @@ get key keys1y (Postgres conn table) = exeStmt conn ("SELECT * FROM \"" ++ DT.un
 
 
 mkSqlWhereClause :: [DT.Text] -> String
-mkSqlWhereClause keysList = DL.concat $ DL.intersperse " AND " $ map (\key -> "(\"" ++ DT.unpack key ++ "\"=?)") keysList
-
+mkSqlWhereClause keysList = DL.intercalate " AND " (map (\key -> "(\"" ++ DT.unpack key ++ "\"=?)") keysList)

@@ -59,6 +59,6 @@ makeEmail :: DT.Text -> DT.Text -> DT.Text -> Mime.Mail
 makeEmail uname email url =
 	Mime.simpleMail'
 		(Mime.Address (Just uname) email)
-		(Mime.Address (Just $ DT.append Branding.visibleName " Verification") ("root@localhost"))
+		(Mime.Address (Just $ DT.append Branding.visibleName " Verification") "root@localhost")
 		(DT.append Branding.visibleName " Account")
 		(DTL.concat [ "Your URL is ", DTL.fromChunks [ url ] ])

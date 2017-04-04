@@ -45,7 +45,7 @@ expand' nameValPairs maybeFront template = fmap (map (substitute (nameValPairs, 
 
 -- Recursive substitution of <field name="colname"/> and <frontSide/> nodes.
 -- Anything else is passed through verbatim.
-substitute ::  ([(DT.Text, Maybe String)], Maybe DT.Text) -> XML.Node -> XML.Node
+substitute :: ([(DT.Text, Maybe String)], Maybe DT.Text) -> XML.Node -> XML.Node
 
 substitute (pairs, _) n@(XML.NodeElement (XML.Element (XML.Name "field" Nothing Nothing) attrs [])) = maybe n fieldNameValue (DM.lookup "name" attrs) where
 		fieldNameValue fldName = XML.NodeContent $ maybe

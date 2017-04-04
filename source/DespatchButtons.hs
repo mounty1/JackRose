@@ -20,11 +20,11 @@ import Data.Maybe (listToMaybe, catMaybes, fromMaybe)
 
 -- | User has pressed a button; look up associated action in table, or supply default.
 despatch :: a -> [(DT.Text, DT.Text -> a)] -> Foundation.Handler a
-despatch deflRoute routeList = YA.requireAuthId >> (Y.runInputPost $ fmap (justOne deflRoute) $ sequenceA $ map blurb routeList)
+despatch deflRoute routeList = YA.requireAuthId >> Y.runInputPost (fmap (justOne deflRoute) $ sequenceA $ map blurb routeList)
 
 
 blurb :: (DT.Text, DT.Text -> a) -> Y.FormInput Foundation.Handler (Maybe a)
-blurb (label, route) = (fmap route) `fmap` (Y.iopt Y.textField label)
+blurb (label, route) = fmap route `fmap` Y.iopt Y.textField label
 
 
 justOne :: a -> [Maybe a] -> a

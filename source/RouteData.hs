@@ -8,7 +8,7 @@ Portability: undefined
 -}
 
 
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, MultiParamTypeClasses, QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
 
 
 module RouteData (routeData) where

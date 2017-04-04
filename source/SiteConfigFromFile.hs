@@ -49,7 +49,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 
 	-- we can't use the configured logging level because the configuration file can't be read.
 	warnBadConfigFile :: Show s => s -> IO (Either a DC.ConfigParser)
-	warnBadConfigFile err = runFilteredLoggingT fallbackDebugLevel (logWarnNS configLogName (DT.pack $ show err)) >> (return $ Right initConfig)
+	warnBadConfigFile err = runFilteredLoggingT fallbackDebugLevel (logWarnNS configLogName (DT.pack $ show err)) >> return (Right initConfig)
 
 	-- feed the user data STM, the configuration file contents and now the database connection pool, into the creation of the site object.
 	assembleConf :: TVar JRState.PostgresConnPool -> TVar JRState.DataSchemes -> TVar JRState.UserConfig -> DC.ConfigParser -> IO JRState.JRState
@@ -67,7 +67,7 @@ siteObject argsMap = atomically (newTVar DM.empty) >>= \r -> atomically (newTVar
 						extractConfItem Just Nothing "portNumber" $
 							extractConfNumItem 120 "sessionMinutes" $
 								extractConfItem id False "shuffle" $
-									extractConfItem id True "secureSession" $ (connLabels, JRState.JRState verbosity pool)
+									extractConfItem id True "secureSession" (connLabels, JRState.JRState verbosity pool)
 		-- create the site object and return it, logging information, warnings and errors as required.
 		spliceShared :: Show l => ([DT.Text], TVar JRState.PostgresConnPool -> TVar JRState.DataSchemes -> TVar JRState.UserConfig -> JRState.JRState) -> Either l [String] -> IO JRState.JRState
 		spliceShared (labels, fn) keysE = runFilteredLoggingT verbosity (either munchErr munchKeys keysE) >> return site where

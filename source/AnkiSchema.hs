@@ -68,7 +68,7 @@ RevLog
 	usn	Int32 NOT NULL
 	ease	Int32 NOT NULL
 	ivl	Int32 NOT NULL
-	lastIvl       Int32 NOT NULL
+	lastIvl	Int32 NOT NULL
 	factor	Int32 NOT NULL
 	time	Int32 NOT NULL
 	type	Int32 NOT NULL

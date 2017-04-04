@@ -112,17 +112,17 @@ nextItem activityState extras user views = listToMaybe `fmap` selectList ((Learn
 
 -- | Return the first new item for review, if there be one.
 newItem :: UserId -> [Y.Key View] -> OneLearnPersist
-newItem user views = nextItem 0 [] user views
+newItem = nextItem 0 []
 
 
 -- | Return the next item for review, if there be one.
 dueItem :: UserId -> UTCTime -> [Y.Key View] -> OneLearnPersist
-dueItem user stamp views = nextItem 2 [ LearnDatumNextReview <. stamp ] user views
+dueItem user stamp = nextItem 2 [ LearnDatumNextReview <. stamp ] user
 
 
 -- | All data rows referring to the given external data source.
 allSourceKeys :: Y.Key DataSource -> PersistResult [DT.Text]
-allSourceKeys dsId = map pickKey `fmap` (selectList [ DataRowDataSourceRowId ==. dsId ] [])
+allSourceKeys dsId = map pickKey `fmap` selectList [ DataRowDataSourceRowId ==. dsId ] []
 
 
 pickKey :: Y.Entity DataRow -> DT.Text
@@ -148,7 +148,7 @@ mkLearnDatum = LearnDatum
 -- and all subordinate data.
 deleteItems :: forall (m :: * -> *). Y.MonadIO m => [DT.Text] -> ReaderT (Y.PersistEntityBackend DataRow) m [()]
 -- break up the deletion into chunks in order not to have too many variables in the SQL statement
-deleteItems deletees = sequence $ map (\portion -> deleteCascadeWhere [DataRowTableKey <-. portion]) $ split 10 deletees
+deleteItems deletees = mapM (\portion -> deleteCascadeWhere [DataRowTableKey <-. portion]) $ split 10 deletees
 
 
 -- | return list of views that refer to the given data source

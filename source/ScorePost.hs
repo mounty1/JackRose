@@ -37,7 +37,7 @@ postScoreR :: Foundation.Handler YC.Html
 postScoreR = YA.requireAuthId >> despatch (const $ YC.redirect $ Foundation.AuthR YA.LogoutR) routeTable >>= \action -> SessionItemKey.get >>= action
 
 
-type ParameteredRoute = DT.Text ->  Maybe (Y.Key LearnDatum) -> Foundation.Handler YC.Html
+type ParameteredRoute = DT.Text -> Maybe (Y.Key LearnDatum) -> Foundation.Handler YC.Html
 
 
 routeTable :: [( DT.Text, ParameteredRoute)]
@@ -87,7 +87,7 @@ nominalDay = fromInteger $ 24 * 60 * 60
 -- | implement SM2+ algorithm at <http://www.blueraja.com/blog/477/a-better-spaced-repetition-learning-algorithm-sm2>
 nextReviewDate :: Y.Key LearnDatum -> Int8 -> UTCTime -> LearnDatum -> ReaderT SqlBackend IO UTCTime
 -- This is the point at which to branch on spaceAlgorithm
-nextReviewDate datumId numGrade timeNow (LearnDatum _ _ _ _ _ difficulty secsBetweenReviews nextReview) = LearningData.lastHistory 1 datumId >>= return . flip addUTCTime timeNow . reviewIncrement where
+nextReviewDate datumId numGrade timeNow (LearnDatum _ _ _ _ _ difficulty secsBetweenReviews nextReview) = fmap (flip addUTCTime timeNow . reviewIncrement) (LearningData.lastHistory 1 datumId) where
 	reviewIncrement :: [History] -> NominalDiffTime
 	reviewIncrement [] = calculation nominalDay
 	reviewIncrement (History _ stamp1 _ : _) = calculation (diffUTCTime timeNow stamp1)
