@@ -1,11 +1,11 @@
+.directory
 site/*.png
 site/documentation
-.directory
+test/jackrose.aes
+test/jackrose.sqlite
+test/jackrose.sqlite-wal
+test/jackrose.sqlite-shm
 source/dist
 source/cabal.sandbox.config
-sandbox/jackrose.aes
-sandbox/jackrose.sqlite
-sandbox/jackrose.sqlite-wal
-sandbox/jackrose.sqlite-shm
 source/.cabal-sandbox
 source/.stack-work
