@@ -1,5 +1,5 @@
 {-|
-Description: Execute a SQL statement.
+Description: Execute a SQL statement and do something to the result.
 Copyright: (c) Michael Mounteney, 2017
 License: BSD 3 clause
 Maintainer: the project name, all lower case, at landcroft dot com
@@ -14,7 +14,9 @@ import Database.HDBC (execute, sFetchAllRows, prepare, toSql)
 import Database.HDBC.PostgreSQL (Connection)
 
 
--- | A connection, a command and a list of substitution parameters.
-exeStmt :: Connection -> String -> [String] -> IO [[Maybe String]]
+-- | A conversion function, connection, a command and a list of substitution parameters.
+-- We *always* do *something* with the result, so we might as well put the conversion here.
+-- It generally makes the calling site much tidier.
+exeStmt :: ([[Maybe String]] -> a) -> Connection -> String -> [String] -> IO a
 -- TODO actually look at the Integer returned and throw an error if necessary
-exeStmt conn command substs = prepare conn command >>= \stmt -> execute stmt (map toSql substs) >> sFetchAllRows stmt
+exeStmt mash conn command substs = prepare conn command >>= \stmt -> execute stmt (map toSql substs) >> fmap mash (sFetchAllRows stmt)

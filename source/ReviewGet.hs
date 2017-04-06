@@ -151,10 +151,9 @@ noSomething label item = YC.liftIO $ return $ Just $ Left $ DT.concat [label, " 
 
 readFromSource :: Entity LearnDatum -> DT.Text -> [DT.Text] -> DataDescriptor -> LearningData.View -> LearnItemParameters
 readFromSource item key deckDrilled (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse _ style) =
-	YC.liftIO $ fmap
-			(Just . fmap ((,) item . PH.documentXHTML style (DT.concat $ DL.intersperse "/" (if null deckDrilled then [] else reverse deckDrilled ++ [":"]) ++ [viewName]) PH.okButton) . CardExpand.expand cols Nothing obverse)
-			(ExternalSQL.get key keys1y handle)
-			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
+	YC.liftIO $ ExternalSQL.get mash key keys1y handle where
+	-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
+	mash = Just . fmap ((,) item . PH.documentXHTML style (DT.concat $ DL.intersperse "/" (if null deckDrilled then [] else reverse deckDrilled ++ [":"]) ++ [viewName]) PH.okButton) . CardExpand.expand cols Nothing obverse
 
 
 -- put the necessary data into the session so that the POST knows what to add or update.

@@ -18,8 +18,8 @@ import qualified Data.Text as DT (Text, unpack)
 
 
 -- | Compose and execute a SQL SELECT statement, to obtain the data-row with the specified primary key.
-get :: DT.Text -> [DT.Text] -> DataHandle -> IO [[Maybe String]]
-get key keys1y (Postgres conn table) = exeStmt conn ("SELECT * FROM \"" ++ DT.unpack table ++ "\" WHERE " ++ mkSqlWhereClause keys1y ++ ";") (map DT.unpack $ deSerialise key)
+get :: ([[Maybe String]] -> a) -> DT.Text -> [DT.Text] -> DataHandle -> IO a
+get mash key keys1y (Postgres conn table) = exeStmt mash conn ("SELECT * FROM \"" ++ DT.unpack table ++ "\" WHERE " ++ mkSqlWhereClause keys1y ++ ";") (map DT.unpack $ deSerialise key)
 
 
 mkSqlWhereClause :: [DT.Text] -> String

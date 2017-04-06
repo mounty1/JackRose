@@ -70,7 +70,6 @@ noSomething label item = return $ PH.documentHTMLNotice $ DT.concat [label, " lo
 -- TODO should obtain the view deck hierarchy name as well
 readFromSource :: DT.Text -> DataDescriptor -> LearningData.View -> LearnItemParameters
 readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse reverze style) =
-	YC.liftIO $ fmap
-			(either (PH.documentHTML style viewName) (PH.documentXHTML style viewName PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze)
-			(ExternalSQL.get key keys1y handle)
-			-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
+	YC.liftIO $ ExternalSQL.get mash key keys1y handle where
+	-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
+	mash = either (PH.documentHTML style viewName) (PH.documentXHTML style viewName PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze

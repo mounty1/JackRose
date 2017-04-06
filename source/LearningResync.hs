@@ -20,7 +20,7 @@ module LearningResync (update) where
 
 import Data.Time (getCurrentTime, UTCTime)
 import Control.Exception (catch)
-import Data.List (foldl', intersperse, (\\))
+import Data.List (foldl', intersperse, (\\), uncons)
 import qualified Database.HDBC as HDBC (SqlError, SqlColDesc, describeTable)
 import qualified Data.Map as DM (insert, adjust, lookup)
 import qualified Data.Text as DT (Text, concat, pack, unpack, empty, null)
@@ -175,13 +175,12 @@ connection site [ "P", serverIP, maybePortNo, maybeDBase, dataTable, maybeUserna
 
 	pullStructure conn = HDBC.describeTable conn tableNameStr >>= mashIntoFields conn
 
-	mashIntoFields conn rows = fmap (maybe [] (map DT.pack) . mapM head) (exeStmt conn primyKeyQuery [])
+	mashIntoFields conn rows = exeStmt mashColNames conn primyKeyQuery []
 		>>= kazam conn rows
 
-	kazam conn rows primaryKey = fmap
-		(Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey . mashHeads)
-		(exeStmt conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" ORDER BY " ++ keysList ++ ";") []) where
+	kazam conn rows primaryKey = exeStmt mash conn ("SELECT " ++ keysList ++ " FROM \"" ++ tableNameStr ++ "\" ORDER BY " ++ keysList ++ ";") [] where
 		keysList = primyKeysForQ primaryKey
+		mash = Right . OpenDataSource (Postgres conn dataTable) (map putColHead rows) primaryKey . mashHeads
 
 	primyKeyQuery = "SELECT \"attname\" FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = '\"" ++ tableNameStr ++ "\"'::regclass AND i.indisprimary ORDER BY a.attnum;"
 
@@ -200,6 +199,10 @@ connection _ connStr = return $ Left $ DT.concat ("invalid connection string: " 
 -- TODO do something useful if the key be Nothing;  i.e., if any key field be Nothing
 mashHeads :: [[Maybe String]] -> [DT.Text]
 mashHeads = map (enSerialise . map DT.pack) . mapMaybe sequence
+
+
+mashColNames :: [[Maybe String]] -> [DT.Text]
+mashColNames = map $ maybe DT.empty (maybe DT.empty (DT.pack . fst) . uncons) . sequence
 
 
 sourceFail :: String -> HDBC.SqlError -> IO (Either DT.Text OpenDataSource)
