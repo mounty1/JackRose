@@ -18,7 +18,7 @@ import qualified Yesod as Y
 import qualified Yesod.Auth as YA
 import qualified Yesod.Core as YC
 import qualified Foundation
-import qualified Data.Text as DT (Text, head)
+import qualified Data.Text as DT (Text, uncons)
 import qualified JRState (tablesFile)
 import GoHome (goHome)
 import LearningData (get, insert, History(History), LearnDatum(LearnDatum), updateTimeStamp, lastHistory)
@@ -57,9 +57,10 @@ justGoHome _ _ = goHome
 justLogout _ _ = YC.redirect (Foundation.AuthR YA.LogoutR)
 
 
-writeGrade "" _ = FailureMessage.page "?? null grade ??"
-writeGrade _ Nothing = FailureMessage.page "?? item ??"
-writeGrade grade (Just itemId) = pearl (scaledGrade $ DT.head grade) itemId
+-- Fail on empty grade text or no learn datum
+writeGrade grade = maybe
+		(FailureMessage.page "?? item ??")
+		(maybe (const $ FailureMessage.page "?? null grade ??") (pearl . scaledGrade . fst) (DT.uncons grade))
 
 
 pearl :: Int8 -> Y.Key LearnDatum -> Foundation.Handler YC.Html
