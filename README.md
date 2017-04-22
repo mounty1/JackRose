@@ -6,7 +6,7 @@ In particular, you'll need a running Postgres server and will have to run some S
 
 Implemented using the Yesod framework.
 
-[Building and running instructions](site/README.md).
+[Building and running instructions](test/README.md).
 [Introductory page](http://www.landcroft.com/jackrose).
 [Haddock](http://www.landcroft.com/jackrose/documentation/doc/html/JackRose/JackRose/index.html).
 
