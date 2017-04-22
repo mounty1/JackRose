@@ -4,13 +4,11 @@ Spaced Repetition Software as a web service
 Project status:  **alpha**.  You can run it if you are prepared to do some work.
 In particular, you'll need a running Postgres server and will have to run some SQL statements.
 
-[Building and running instructions](sandbox/README.md)
-
 Implemented using the Yesod framework.
 
-[Introductory page](http://www.landcroft.com/jackrose)
-
-[Haddock](http://www.landcroft.com/jackrose/documentation/doc/html/JackRose/JackRose/index.html)
+[Building and running instructions](site/README.md).
+[Introductory page](http://www.landcroft.com/jackrose).
+[Haddock](http://www.landcroft.com/jackrose/documentation/doc/html/JackRose/JackRose/index.html).
 
 As this is a learning exercise for the author:
 - It is likely that best practice is not followed in some areas.
