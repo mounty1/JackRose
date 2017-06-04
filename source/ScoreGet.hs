@@ -18,7 +18,6 @@ import qualified Yesod.Core as YC
 import qualified Yesod.Auth as YA
 import qualified Foundation (Handler)
 import qualified Data.Text as DT (Text, concat)
-import qualified Text.XML as XML (Document)
 import qualified Data.Map as DM
 import qualified JRState (runFilteredLoggingT, getDataSchemes, JRState, tablesFile)
 import LearningData (LearnDatum(..), DataRow(..))
@@ -28,13 +27,14 @@ import Database.Persist.Sql (runSqlPool, fromSqlKey, Key, ToBackendKey, SqlBacke
 import Control.Monad.Trans.Reader (ReaderT)
 import GoHome (goHome)
 import qualified PresentHTML as PH
-import qualified SessionItemKey (get, set)
+import qualified SessionItemKey (get)
 import ConnectionSpec (DataDescriptor(..))
 import CardExpand (expand)
 import ExternalSQL (get)
+import qualified CardItemGet (PresentationParams, rememberItem)
 
 
-type LearnItemParameters = forall m. (YC.MonadIO m, YC.MonadBaseControl IO m) => ReaderT SqlBackend m XML.Document
+type LearnItemParameters = forall m. YC.MonadIO m => ReaderT SqlBackend m CardItemGet.PresentationParams
 
 
 -- | Process /OK/ button;  first extract item id. from session data
@@ -43,10 +43,11 @@ getScoreR = YA.requireAuthId >> SessionItemKey.get >>= maybe goHome showAnswer
 
 
 showAnswer :: Key LearnDatum -> Foundation.Handler YC.Html
-showAnswer itemId = SessionItemKey.set itemId >> YC.getYesod >>= showAnswer' itemId
+showAnswer itemId = YC.getYesod >>= showAnswer' itemId
+
 
 showAnswer' :: Key LearnDatum -> JRState.JRState -> Foundation.Handler YC.Html
-showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) >>= PH.toHTMLdoc where
+showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) >>= CardItemGet.rememberItem where
 
 	fn2 = LearningData.get itemId >>= maybe (noSomething "item" itemId) getItemAndViewIds
 
@@ -60,16 +61,16 @@ showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRSt
 
 	readFromView :: LearnDatum -> DT.Text -> DataDescriptor -> LearnItemParameters
 	readFromView (LearnDatum viewId _ _ _ _ _ _ _) key descriptor = LearningData.get viewId
-			>>= maybe (noSomething "view" viewId) (readFromSource key descriptor)
+			>>= maybe (noSomething "view" viewId) (readFromSource itemId key descriptor)
 
 
-noSomething :: (YC.MonadIO m, ToBackendKey SqlBackend record) => DT.Text -> Key record -> ReaderT SqlBackend m XML.Document
-noSomething label item = return $ PH.documentHTMLNotice $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
+noSomething :: ToBackendKey SqlBackend record => DT.Text -> Key record -> LearnItemParameters
+noSomething label item = YC.liftIO $ return $ Left $ DT.concat [label, " lost: ", showt $ fromSqlKey item]
 
 
 -- TODO should obtain the view deck hierarchy name as well
-readFromSource :: DT.Text -> DataDescriptor -> LearningData.View -> LearnItemParameters
-readFromSource key (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse reverze style) =
+readFromSource :: Key LearnDatum -> DT.Text -> DataDescriptor -> LearningData.View -> LearnItemParameters
+readFromSource itemId key (DataDescriptor cols keys1y handle) (LearningData.View viewName _ obverse reverze style) =
 	YC.liftIO $ ExternalSQL.get mash key keys1y handle where
 	-- if we get a [XML.Node] back, pack it up;  if a Left error, pass it unchanged.
-	mash = either (PH.documentHTML style viewName) (PH.documentXHTML style viewName PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze
+	mash = fmap ((,) itemId . PH.documentXHTML style viewName PH.gradeButtons) . CardExpand.expand cols (Just obverse) reverze
