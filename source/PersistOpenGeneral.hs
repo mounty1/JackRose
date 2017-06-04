@@ -40,5 +40,6 @@ semiToSpace ';' = ' '
 semiToSpace c = c
 
 
-prefixPg :: DT.Text
+prefixPg, prefixLite :: DT.Text
 prefixPg = DT.pack "dbi:Pg:"
+prefixLite = DT.pack "dbi:SQLite:" -- dbname=$dbfile, or uri=file:...?params...
