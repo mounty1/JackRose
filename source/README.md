@@ -1,5 +1,6 @@
 # CODING AND LAYOUT STANDARDS
 
+- No anonymous name importation;  either import qualified or import an explicit list.
 - No 'do'.
 - No [partial functions](https://wiki.haskell.org/Avoiding_partial_functions):  mainly replace 'head' with 'uncons'.
 - Single tab indentation.
