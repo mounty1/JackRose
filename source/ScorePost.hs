@@ -57,7 +57,9 @@ justGoHome _ _ = goHome
 justLogout _ _ = YC.redirect (Foundation.AuthR YA.LogoutR)
 
 
--- Fail on empty grade text or no learn datum
+-- Fail on empty grade text or no learn datum.
+-- Neither of thse 'should happen';  their doing so implies something wrong with
+-- the browser's session management or POST implementation.
 writeGrade grade = maybe
 		(FailureMessage.page "?? item ??")
 		(maybe (const $ FailureMessage.page "?? null grade ??") (pearl . scaledGrade . fst) (DT.uncons grade))

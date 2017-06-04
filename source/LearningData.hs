@@ -96,9 +96,11 @@ History
 	3 suppressed by selection criteria
 -}
 
-{- For LearnDatum, the 'factor' data have a meaning determined by the spacing algorithm;
-    in a PL the algorithm and factors would be a Data type or variant record.
-    For the full horror, see ScorePost.hs -}
+{-
+For LearnDatum, the 'factor' data have a meaning determined by the spacing algorithm;
+in a PL the algorithm and factors would be a Data type or variant record.
+For usage in a particular spacing algorithm, see ScorePost.hs
+-}
 
 type PersistResult a = forall (m :: * -> *). Y.MonadIO m => ReaderT SqlBackend m a
 
@@ -106,7 +108,7 @@ type OneLearnPersist = PersistResult (Maybe (Y.Entity LearnDatum))
 
 
 nextItem :: Int8 -> [Y.Filter LearnDatum] -> UserId -> [Y.Key View] -> OneLearnPersist
--- It's a good idea to keep listToMaybe with LimitTo 1 because they make sense together.
+-- It's a good idea to keep listToMaybe and LimitTo 1 together because they make sense together.
 nextItem activityState extras user views = listToMaybe `fmap` selectList ((LearnDatumActivity ==. activityState) : (LearnDatumUser ==. user) : (LearnDatumViewUID <-. views) : extras) [ LimitTo 1 ]
 
 
@@ -126,7 +128,7 @@ allSourceKeys dsId = map pickKey `fmap` selectList [ DataRowDataSourceRowId ==. 
 
 
 pickKey :: Y.Entity DataRow -> DT.Text
-pickKey (Y.Entity _ (DataRow key _ _)) = key
+pickKey = dataRowTableKey . entityVal
 
 
 -- | Replace the next-review time-stamp on a learn datum.
