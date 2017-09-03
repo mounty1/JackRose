@@ -16,7 +16,7 @@ this source.
 {-# OPTIONS_HADDOCK prune #-}
 
 
-module DeckData (migrateData, userDeckNodes, userDeckEnds, userDeckEndsViewed, UserDeckNode(..), UserDeckEnd(..), UserDeckNodeId, UserDeckEndId) where
+module DeckData (migrateData, userDeckNodes, userDeckEnds, userDeckEndsViewed, UserDeckNode(..), UserDeckEnd(..), UserDeckNodeId) where
 
 
 import qualified Yesod as Y

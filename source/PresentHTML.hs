@@ -15,7 +15,7 @@ If we ever have to support older browsers, <https://www.google.com.au/search?q=h
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module PresentHTML (toHTMLdoc, documentHTMLNotice, documentHTML, documentXHTML, gradeButtons, okButton) where
+module PresentHTML (toHTMLdoc, documentHTMLNotice, documentXHTML, gradeButtons, okButton) where
 
 
 import qualified Yesod.Core as YC

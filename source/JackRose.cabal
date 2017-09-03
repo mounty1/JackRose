@@ -13,30 +13,22 @@ executable JackRose
                       yesod-core,
                       yesod-auth,
                       yesod-auth-account,
-                      yesod-auth-hashdb,
                       text,
-                      http-types,
                       bytestring,
-                      fast-logger,
                       monad-logger,
                       monad-control,
                       persistent-postgresql,
                       HDBC,
                       HDBC-postgresql,
-                      smtp-mail,
                       ConfigFile,
                       mtl,
                       stm,
                       transformers,
                       text-show,
                       time,
-                      MissingH,
-                      xml,
                       xml-conduit,
-                      filepath,
                       wai,
                       blaze-html,
-                      resourcet,
                       mime-mail,
                       persistent,
                       persistent-template,
@@ -46,6 +38,7 @@ executable JackRose
                       Authorisation
                       Branding
                       CardExpand
+                      CardItemGet
                       CommandArgs
                       ConnectionSpec
                       DeckData

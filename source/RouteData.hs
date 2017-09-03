@@ -22,10 +22,10 @@ import qualified Yesod.Routes.TH.Types as YT
 -- | Routing table.
 routeData :: [YT.ResourceTree String]
 routeData = [YC.parseRoutes|
-	/ HomeR GET POST
-	/favicon.ico IconR GET
-	/score ScoreR GET POST
-	/notice/#Text NoticeR GET POST
-	/review/#Text ReviewR GET
-	/auth AuthR YA.Auth YA.getAuth
-	|]
+  / HomeR GET POST
+  /favicon.ico IconR GET
+  /score ScoreR GET POST
+  /notice/#Text NoticeR GET POST
+  /review/#Text ReviewR GET
+  /auth AuthR YA.Auth YA.getAuth
+  |]

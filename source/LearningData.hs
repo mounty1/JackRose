@@ -24,8 +24,6 @@ module LearningData (migrateData,
 		DataRow(..),
 		View(..),
 		ViewId,
-		DataRowId,
-		LearnDatumId,
 		LearnDatum(..),
 		dueItem,
 		newItem,
@@ -36,7 +34,6 @@ module LearningData (migrateData,
 		deleteItems,
 		allSourceKeys,
 		mkLearnDatum,
-		mkLearnDatumKey,
 		viewsOnDataSource,
 		lastHistory) where
 
@@ -134,11 +131,6 @@ pickKey = dataRowTableKey . entityVal
 -- | Replace the next-review time-stamp on a learn datum.
 updateTimeStamp :: forall (m :: * -> *). Y.MonadIO m => Y.Key LearnDatum -> UTCTime -> ReaderT SqlBackend m ()
 updateTimeStamp key time = update key [ LearnDatumNextReview =. time, LearnDatumActivity =. 2 ]
-
-
--- | Wrap non-exportable @LearnItem@.
-mkLearnDatumKey :: ViewId -> DataRowId -> UserId -> Y.Unique LearnDatum
-mkLearnDatumKey = LearnItem
 
 
 -- | Wrap non-exportable @LearnDatum@.

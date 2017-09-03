@@ -1,0 +1,32 @@
+- package:
+  - name: JackRose
+  - section:
+    - name: exe:AnkiConvert exe:JackRose
+    - message:
+      - name: Module reused between components
+      - module:
+        - Authorisation
+        - Branding
+        - CommandArgs
+        - ConnectionSpec
+        - DeckData
+        - ExecuteSqlStmt
+        - JRState
+        - LearningData
+        - LearningResync
+        - LogFilter
+        - MaybeIntValue
+        - PersistOpenGeneral
+        - Persistency
+        - SiteConfigFromFile
+        - SplitList
+        - TextList
+        - UserDeck
+  - section:
+    - name: exe:JackRose
+    - message:
+      - name: Weeds exported
+      - module:
+        - name: Foundation
+        - identifier: Widget
+

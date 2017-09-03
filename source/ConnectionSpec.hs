@@ -8,7 +8,7 @@ Portability: undefined
 -}
 
 
-module ConnectionSpec where
+module ConnectionSpec (DataHandle(Postgres), DataDescriptor(..), PostgresConnection(..)) where
 
 
 import Data.Text (Text)
