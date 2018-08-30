@@ -93,9 +93,9 @@ descendToDeckRoot _ _ _ _ (_, []) = FailureMessage.page "nowhere to go"
 -- This is significant inasmuch as if it be deterministic, there will be no randomness if the user goes away then tries again later.
 -- The algorithm must present an item if any be due;  otherwise a 'new' item, constrained by the cascaded throttle,
 -- which is the daily (well, sliding 24 hour window) limit on new cards.
-descendToDeckRoot site throttle [] deckDrilled (userId, stuff : _) = searchForExistingByTable site userId flattenedDeck deckDrilled >>= maybe fallToNew CardItemGet.rememberItem where
+descendToDeckRoot site throttle [] deckDrilled (userId, stuff) = searchForExistingByTable site userId flattenedDeck deckDrilled >>= maybe fallToNew CardItemGet.rememberItem where
 		fallToNew = searchForNew site userId throttle flattenedDeck deckDrilled >>= maybe (YC.redirect $ Foundation.NoticeR "No more reviews due") CardItemGet.rememberItem
-		flattenedDeck = tableList stuff
+		flattenedDeck = concatMap tableList stuff
 
 -- both XPath-like and tree;  find a matching node (if it exist) and descend
 descendToDeckRoot site throttle deckPath@(d1 : dn) deckDrilled (userId, UserDeck.SubDeck maybeThrottle shuffle label item : rest) =
