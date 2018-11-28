@@ -30,7 +30,7 @@ module LearningData (migrateData,
 		History(..),
 		Y.get,
 		Y.insert,
-		updateTimeStamp,
+		updateLearnDatum,
 		deleteItems,
 		allSourceKeys,
 		mkLearnDatum,
@@ -76,7 +76,6 @@ LearnDatum
 	activity Int8 NOT NULL
 	spaceAlgorithm Int8 NOT NULL
 	factor1 Double NOT NULL
-	factor2 Double NOT NULL
 	nextReview UTCTime NOT NULL
 	LearnItem viewUID itemId user
 History
@@ -129,12 +128,12 @@ pickKey = dataRowTableKey . entityVal
 
 
 -- | Replace the next-review time-stamp on a learn datum.
-updateTimeStamp :: forall (m :: * -> *). Y.MonadIO m => Y.Key LearnDatum -> UTCTime -> ReaderT SqlBackend m ()
-updateTimeStamp key time = update key [ LearnDatumNextReview =. time, LearnDatumActivity =. 2 ]
+updateLearnDatum :: forall (m :: * -> *). Y.MonadIO m => Y.Key LearnDatum -> UTCTime -> Double -> ReaderT SqlBackend m ()
+updateLearnDatum key time factor = update key [ LearnDatumNextReview =. time, LearnDatumFactor1 =. factor, LearnDatumActivity =. 2 ]
 
 
 -- | Wrap non-exportable @LearnDatum@.
-mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> Int8 -> Double -> Double -> UTCTime -> LearnDatum
+mkLearnDatum :: ViewId -> Y.Key DataRow -> UserId -> Int8 -> Int8 -> Double -> UTCTime -> LearnDatum
 mkLearnDatum = LearnDatum
 
 

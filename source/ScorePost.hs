@@ -21,7 +21,7 @@ import qualified Foundation
 import qualified Data.Text as DT (Text, uncons)
 import qualified JRState (tablesFile)
 import GoHome (goHome)
-import LearningData (get, insert, History(History), LearnDatum(LearnDatum), updateTimeStamp, lastHistory)
+import LearningData (get, insert, History(History), LearnDatum(LearnDatum), updateLearnDatum, lastHistory)
 import SessionItemKey (get)
 import Data.Time (UTCTime, getCurrentTime)
 import Data.Time.Clock (addUTCTime, diffUTCTime, NominalDiffTime)
@@ -71,7 +71,9 @@ pearl :: Int8 -> Y.Key LearnDatum -> Foundation.Handler YC.Html
 pearl numGrade datumId = YC.getYesod >>= \site -> YC.liftIO (getCurrentTime >>= \time -> runSqlPool (newHistory time) (JRState.tablesFile site)) >>= maybe goHome FailureMessage.page where
 	newHistory time = LearningData.get datumId >>= maybe
 			(return $ Just "?? learn ??")
-			(\learnD -> LearningData.insert (History datumId time numGrade) >> nextReviewDate datumId numGrade time learnD >>= LearningData.updateTimeStamp datumId >> return Nothing)
+			(\learnD -> nextReviewDate datumId numGrade time learnD >>= uncurry (LearningData.updateLearnDatum datumId)
+				>> LearningData.insert (History datumId time numGrade)
+				>> return Nothing)
 
 
 baseGrade :: Int
@@ -88,18 +90,40 @@ nominalDay = fromInteger $ 24 * 60 * 60
 
 
 -- | implement SM2+ algorithm at <http://www.blueraja.com/blog/477/a-better-spaced-repetition-learning-algorithm-sm2>
-nextReviewDate :: Y.Key LearnDatum -> Int8 -> UTCTime -> LearnDatum -> ReaderT SqlBackend IO UTCTime
+nextReviewDate :: Y.Key LearnDatum -> Int8 -> UTCTime -> LearnDatum -> ReaderT SqlBackend IO (UTCTime, Double)
 -- This is the point at which to branch on spaceAlgorithm
-nextReviewDate datumId numGrade timeNow (LearnDatum _ _ _ _ _ difficulty secsBetweenReviews nextReview) = fmap (flip addUTCTime timeNow . reviewIncrement) (LearningData.lastHistory 1 datumId) where
-	reviewIncrement :: [History] -> NominalDiffTime
-	reviewIncrement [] = calculation nominalDay
-	reviewIncrement (History _ stamp1 _ : _) = calculation (diffUTCTime timeNow stamp1)
-	calculation :: NominalDiffTime -> NominalDiffTime
-	calculation deltaTime = realToFrac $ if incorrect then (secsBetweenReviews / difficultyWeight * difficultyWeight) `min` 1.0 else secsBetweenReviews * (1.0 + (difficultyWeight - 1.0)*percentOverdue) where
+nextReviewDate datumId numGrade timeNow (LearnDatum _ _ _ _ _ difficulty nextReview) = fmap reviewIncrement (LearningData.lastHistory 1 datumId) where
+	reviewIncrement :: [History] -> (UTCTime, Double)
+	-- If there be no learning history for this item, pretend with one day ago
+	reviewIncrement [] = calculation (addUTCTime (- nominalDay) timeNow)
+	reviewIncrement [History _ stamp1 _] = calculation stamp1
+	reviewIncrement _ = error $ "lastHistory 1 returned n"
+
+	calculation :: UTCTime -> (UTCTime, Double)
+	calculation dateLastReviewed = (addUTCTime secsBetweenReviewsNext timeNow, difficultyNext) where
+
 		percentOverdue :: Double
-		percentOverdue = if incorrect then 1.0 else 2.0 `min` realToFrac (deltaTime / diffUTCTime timeNow nextReview)
-		difficultyNext = (difficulty * percentOverdue * (8.0 - 9.0 * performanceRating) / 17.0) `max` 1.0 `min` 0.0
+		percentOverdue =  if incorrect then 1.0 else 2.0 `min` realToFrac (diffUTCTime timeNow dateLastReviewed / secsBetweenReviews)
+
+		difficultyNext :: Double
+		difficultyNext = (difficulty + percentOverdue * (8.0 - 9.0 * performanceRating) / 17.0) `max` 0.0 `min` 1.0
+
+		secsBetweenReviewsNext :: NominalDiffTime
+		secsBetweenReviewsNext = (secsBetweenReviews * spacingFactor) `max` nominalDay
+
+		spacingFactor = if incorrect then
+				recip $ realToFrac $ difficultyWeight * difficultyWeight
+			else
+				realToFrac $ 1.0 + (difficultyWeight - 1.0) * percentOverdue
+
+		secsBetweenReviews :: NominalDiffTime
+		-- floor 1.0 here in case dateLastReviewed is after nextReview
+		secsBetweenReviews = diffUTCTime nextReview dateLastReviewed `max` 1.0
+
+		difficultyWeight :: Double
 		difficultyWeight = 3.0 - 1.7 * difficultyNext
+
 	incorrect = performanceRating < 0.6
+
 	performanceRating :: Double
 	performanceRating = fromIntegral numGrade / fromIntegral (scaledGrade '9')

@@ -52,7 +52,7 @@ showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRSt
 	fn2 = LearningData.get itemId >>= maybe (noSomething "item" itemId) getItemAndViewIds
 
 	getItemAndViewIds :: LearnDatum -> LearnItemParameters
-	getItemAndViewIds item@(LearnDatum _ rowItemId _ _ _ _ _ _) = LearningData.get rowItemId
+	getItemAndViewIds item@(LearnDatum _ rowItemId _ _ _ _ _) = LearningData.get rowItemId
 			>>= maybe (noSomething "data row" rowItemId) (formatItem item)
 
 	formatItem :: LearnDatum -> DataRow -> LearnItemParameters
@@ -60,7 +60,7 @@ showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRSt
 			>>= maybe (noSomething "live data source" source) (readFromView item key) . DM.lookup source
 
 	readFromView :: LearnDatum -> DT.Text -> DataDescriptor -> LearnItemParameters
-	readFromView (LearnDatum viewId _ _ _ _ _ _ _) key descriptor = LearningData.get viewId
+	readFromView (LearnDatum viewId _ _ _ _ _ _) key descriptor = LearningData.get viewId
 			>>= maybe (noSomething "view" viewId) (readFromSource itemId key descriptor)
 
 
