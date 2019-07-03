@@ -22,7 +22,7 @@ import qualified Data.Text as DT (Text, uncons)
 import qualified JRState (tablesFile)
 import GoHome (goHome)
 import LearningData (get, insert, History(History), LearnDatum(LearnDatum), updateLearnDatum, lastHistory)
-import SessionItemKey (get)
+import SessionItemData (get)
 import Data.Time (UTCTime, getCurrentTime)
 import Data.Time.Clock (addUTCTime, diffUTCTime, NominalDiffTime)
 import Data.Int (Int8)
@@ -34,7 +34,7 @@ import DespatchButtons (despatch)
 
 -- | User has pressed a /score/ button; update database with new review and go to next item.
 postScoreR :: Foundation.Handler YC.Html
-postScoreR = YA.requireAuthId >> despatch (const $ YC.redirect $ Foundation.AuthR YA.LogoutR) routeTable >>= (SessionItemKey.get >>=)
+postScoreR = YA.requireAuthId >> despatch (const $ YC.redirect $ Foundation.AuthR YA.LogoutR) routeTable >>= (SessionItemData.get >>=)
 
 
 type ParameteredRoute = DT.Text -> Maybe (Y.Key LearnDatum) -> Foundation.Handler YC.Html

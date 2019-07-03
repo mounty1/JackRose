@@ -11,7 +11,7 @@ with what is set, and is returned as the intended type.
 -}
 
 
-module SessionItemKey (set, get) where
+module SessionItemData (set, get) where
 
 
 import Yesod.Core (MonadHandler)
@@ -31,14 +31,14 @@ itemKey = DT.pack "JR.item"
 type DatumType = Key LearnDatum
 
 
--- | Set the key.
+-- | Put the item data into the session
 set :: MonadHandler m => DatumType -> m ()
 set = setSession itemKey . showt . fromSqlKey
 
 
--- | Get the key.
--- The key is then removed from the session; it can only be gotten once.
--- If it will be needed later, it must be re-set.
+-- | Get the item data.
+-- The data are then removed from the session; they can only be gotten once.
+-- If they will be needed later, they must be re-set.
 get :: MonadHandler m => m (Maybe DatumType)
 get = fmap (\mT -> fmap toKey (mT >>= maybeIntValue)) (lookupSession itemKey) >>= (>>) (deleteSession itemKey) . return
 

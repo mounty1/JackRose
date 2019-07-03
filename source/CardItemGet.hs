@@ -17,7 +17,7 @@ import qualified FailureMessage (page)
 import qualified Data.Text as DT (Text)
 import qualified Text.XML as XML (Document)
 import qualified PresentHTML as PH
-import qualified SessionItemKey (set)
+import qualified SessionItemData (set)
 import Database.Persist.Sql (Key)
 import LearningData (LearnDatum(..))
 
@@ -30,4 +30,4 @@ type PresentationParams = Either DT.Text (Key LearnDatum, XML.Document)
 -- TODO a Left indicates inconsistency in the data, so really we should log every one out and fix it.
 rememberItem :: PresentationParams -> Foundation.Handler YC.Html
 rememberItem (Left errCode) = FailureMessage.page errCode
-rememberItem (Right (itemId, document)) = SessionItemKey.set itemId >> PH.toHTMLdoc document
+rememberItem (Right (itemId, document)) = SessionItemData.set itemId >> PH.toHTMLdoc document

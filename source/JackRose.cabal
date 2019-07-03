@@ -65,7 +65,7 @@ executable JackRose
                       RouteData
                       ScoreGet
                       ScorePost
-                      SessionItemKey
+                      SessionItemData
                       SiteConfigFromFile
                       SplitList
                       TextList

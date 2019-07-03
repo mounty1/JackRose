@@ -27,7 +27,7 @@ import Database.Persist.Sql (runSqlPool, fromSqlKey, Key, ToBackendKey, SqlBacke
 import Control.Monad.Trans.Reader (ReaderT)
 import GoHome (goHome)
 import qualified PresentHTML as PH
-import qualified SessionItemKey (get)
+import qualified SessionItemData (get)
 import ConnectionSpec (DataDescriptor(..))
 import CardExpand (expand)
 import ExternalSQL (get)
@@ -39,7 +39,7 @@ type LearnItemParameters = forall m. YC.MonadIO m => ReaderT SqlBackend m CardIt
 
 -- | Process /OK/ button;  first extract item id. from session data
 getScoreR :: Foundation.Handler YC.Html
-getScoreR = YA.requireAuthId >> SessionItemKey.get >>= maybe goHome showAnswer
+getScoreR = YA.requireAuthId >> SessionItemData.get >>= maybe goHome showAnswer
 
 
 showAnswer :: Key LearnDatum -> Foundation.Handler YC.Html
