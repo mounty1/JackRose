@@ -14,9 +14,12 @@ import Database.HDBC (execute, sFetchAllRows, prepare, toSql)
 import Database.HDBC.PostgreSQL (Connection)
 
 
--- | A conversion function, connection, a command and a list of substitution parameters.
--- We *always* do *something* with the result, so we might as well put the conversion here.
--- It generally makes the calling site much tidier.
-exeStmt :: ([[Maybe String]] -> a) -> Connection -> String -> [String] -> IO a
--- TODO actually look at the Integer returned and throw an error if necessary
+exeStmt :: ([[Maybe String]] -> a) -- ^ Conversion function.
+	-- We /always/ do /something/ with the result, so we might as well put the conversion here.
+	-- It generally makes the calling site much tidier.
+	-> Connection
+	-> String -- ^ command
+	-> [String]  -- ^ list of substitution parameters.
+	-> IO a
+-- TODO actually look at the 'Integer' returned by 'execute' and throw an error if necessary
 exeStmt mash conn command substs = prepare conn command >>= \stmt -> execute stmt (map toSql substs) >> fmap mash (sFetchAllRows stmt)

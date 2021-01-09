@@ -40,7 +40,7 @@ set = setSession itemKey . showt . fromSqlKey
 -- The data are then removed from the session; they can only be gotten once.
 -- If they will be needed later, they must be re-set.
 get :: MonadHandler m => m (Maybe DatumType)
-get = fmap (\mT -> fmap toKey (mT >>= maybeIntValue)) (lookupSession itemKey) >>= (>>) (deleteSession itemKey) . return
+get = fmap (fmap toKey . (maybeIntValue =<<)) (lookupSession itemKey) >>= (>>) (deleteSession itemKey) . return
 
 
 toKey :: Int64 -> DatumType

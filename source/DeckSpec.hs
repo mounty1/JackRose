@@ -37,7 +37,6 @@ newtype ParsingResult a = ParsingResult (LoggingT IO (Either DT.Text a))
 
 
 unwrapPR :: ParsingResult t -> LoggingT IO (Either DT.Text t)
-
 unwrapPR (ParsingResult value) = value
 
 
@@ -70,7 +69,7 @@ instance Y.MonadBaseControl IO ParsingResult where
 
 
 content :: UserId -> JRState.JRState -> IO (Either DT.Text [UserDeck.UserDeckCpt])
--- | Parse the users's configuration file.  This might fail (returning a @Left DT.Text@)
+-- | Parse the user's configuration file.  This might fail (returning a @Left DT.Text@)
 -- or succeed (returning a @Right [UserDeck.UserDeckCpt]).
 -- Currently, it does not in fact ever fail.  If its implementation changes, retrieve
 -- function failToParse from VC (2017.Feb.3).
@@ -78,8 +77,9 @@ content userId site = JRState.runFilteredLoggingT site $ unwrapPR $ topDeck user
 
 
 topDeck :: UserId -> JRState.JRState -> ParsingResult [UserDeck.UserDeckCpt]
+-- | Root node of the given user's deck hierarchy.
 topDeck uid site = DPQ.runSqlPool (DD.userDeckEnds uid) (JRState.tablesFile site) >>=
-		\terminals -> levelFilter isNothing (JRState.shuffleCards site) terminals `fmap` DPQ.runSqlPool (DD.userDeckNodes uid) (JRState.tablesFile site)
+		(`fmap` DPQ.runSqlPool (DD.userDeckNodes uid) (JRState.tablesFile site)) . levelFilter isNothing (JRState.shuffleCards site)
 
 
 levelFilter :: (Maybe DD.UserDeckNodeId -> Bool) -> Bool -> [DPQ.Entity DD.UserDeckEnd] -> [DPQ.Entity DD.UserDeckNode] -> [UserDeck.UserDeckCpt]

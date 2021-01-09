@@ -23,4 +23,9 @@ get mash key keys1y (Postgres conn table) = exeStmt mash conn ("SELECT * FROM \"
 
 
 mkSqlWhereClause :: [DT.Text] -> String
-mkSqlWhereClause keysList = DL.intercalate " AND " (map (\key -> "(\"" ++ DT.unpack key ++ "\"=?)") keysList)
+mkSqlWhereClause keysList = DL.intercalate " AND " (map makeTerm keysList)
+
+
+-- | thing -> ("thing"=?)
+makeTerm :: DT.Text -> String
+makeTerm = ("(\"" ++) . (++ "\"=?)") . DT.unpack
