@@ -1,0 +1,4 @@
+'[^\.;:]  '	double space
+'	 '	tab-space
+' 	'	space-tab
+'^ '	space indent
