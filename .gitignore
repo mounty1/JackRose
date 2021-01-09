@@ -13,5 +13,5 @@ source/cabal.sandbox.config
 source/.cabal-sandbox
 source/.stack-work
 source/.idea
-source/source.iml
+source/JackRose.iml
 source/stack.yaml.lock
