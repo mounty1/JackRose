@@ -1,4 +1,4 @@
-.hg/
+/.hg/
 .directory
 site/icon-edged.png
 site/icon-outline.png
@@ -8,10 +8,7 @@ test/jackrose.aes
 test/jackrose.sqlite
 test/jackrose.sqlite-wal
 test/jackrose.sqlite-shm
-source/dist
-source/cabal.sandbox.config
-source/.cabal-sandbox
-source/.stack-work
-source/.idea
-source/JackRose.iml
-source/stack.yaml.lock
+/.stack-work
+/.idea
+/JackRose.iml
+/stack.yaml.lock

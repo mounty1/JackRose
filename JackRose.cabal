@@ -6,6 +6,7 @@ cabal-version:      >= 1.20
 
 executable JackRose
   main-is:            JackRose.hs
+  hs-source-dirs:     source
   default-language:   Haskell2010
   ghc-options:        -O2 -Wall -threaded -fno-warn-tabs
   build-depends:      base,
@@ -75,6 +76,7 @@ executable JackRose
 
 executable AnkiConvert
   main-is:            AnkiConvert.hs
+  hs-source-dirs:     source
   default-language:   Haskell2010
   ghc-options:        -O2 -Wall -threaded -fno-warn-tabs
   build-depends:      base,
