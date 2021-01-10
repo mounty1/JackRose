@@ -25,7 +25,7 @@ import qualified LearningData (get, View(..))
 import TextShow (showt)
 import Database.Persist.Sql (runSqlPool, fromSqlKey, Key, ToBackendKey, SqlBackend)
 import Control.Monad.Trans.Reader (ReaderT)
-import GoHome (goHome)
+import Notice (getNoticeR)
 import qualified PresentHTML as PH
 import qualified SessionItemData (get, Bundle(..))
 import ConnectionSpec (DataDescriptor(..))
@@ -39,7 +39,11 @@ type LearnItemParameters = forall m. YC.MonadIO m => ReaderT SqlBackend m CardIt
 
 -- | Process /OK/ button;  first extract item id. from session data
 getScoreR :: Foundation.Handler YC.Html
-getScoreR = YA.requireAuthId >> SessionItemData.get >>= maybe goHome showAnswer
+getScoreR = YA.requireAuthId >> SessionItemData.get >>= maybe noSessionData showAnswer
+
+
+noSessionData  :: Foundation.Handler YC.Html
+noSessionData = getNoticeR "Session data lost"
 
 
 showAnswer :: SessionItemData.Bundle -> Foundation.Handler YC.Html

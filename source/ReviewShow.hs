@@ -22,6 +22,7 @@ import qualified FailureMessage (page)
 import qualified Data.Text as DT (Text, concat)
 import qualified Data.Map as DM
 import qualified Data.List as DL (intersperse)
+import Control.Applicative ((<|>))
 import qualified JRState (runFilteredLoggingT, getDataSchemes, JRState, tablesFile)
 import qualified UserDeck (UserDeckCpt(..), NewThrottle)
 import LearningData (ViewId, LearnDatum(..), DataRow(..), newItem, dueItem)
@@ -115,6 +116,4 @@ readFromSource item key deckDrilled (DataDescriptor cols keys1y handle) (Learnin
 
 
 mergeThrottle :: UserDeck.NewThrottle -> UserDeck.NewThrottle -> UserDeck.NewThrottle
-mergeThrottle Nothing newThrottle = newThrottle
-mergeThrottle already Nothing = already
-mergeThrottle a@(Just already) n@(Just newThrottle) = if already < newThrottle then a else n
+mergeThrottle ell arr = min ell arr <|> ell <|> arr
