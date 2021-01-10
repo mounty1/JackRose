@@ -22,7 +22,7 @@ import qualified Data.Text as DT (Text, uncons)
 import qualified JRState (tablesFile)
 import GoHome (goHome)
 import LearningData (get, insert, History(History), LearnDatum(LearnDatum), updateLearnDatum, lastHistory)
-import SessionItemData (get)
+import SessionItemData (get, Bundle(..))
 import Data.Time (UTCTime, getCurrentTime)
 import Data.Time.Clock (addUTCTime, diffUTCTime, NominalDiffTime)
 import Data.Int (Int8)
@@ -37,7 +37,7 @@ postScoreR :: Foundation.Handler YC.Html
 postScoreR = YA.requireAuthId >> despatch (const $ YC.redirect $ Foundation.AuthR YA.LogoutR) routeTable >>= (SessionItemData.get >>=)
 
 
-type ParameteredRoute = DT.Text -> Maybe (Y.Key LearnDatum) -> Foundation.Handler YC.Html
+type ParameteredRoute = DT.Text -> Maybe Bundle -> Foundation.Handler YC.Html
 
 
 routeTable :: [( DT.Text, ParameteredRoute)]
@@ -58,17 +58,17 @@ justLogout _ _ = YC.redirect (Foundation.AuthR YA.LogoutR)
 
 
 -- Fail on empty grade text or no learn datum.
--- Neither of thse 'should happen';  their doing so implies something wrong with
+-- Neither of these 'should happen';  their doing so implies something wrong with
 -- the browser's session management or POST implementation.
 writeGrade grade = maybe
 		(FailureMessage.page "?? item ??")
 		(maybe (const $ FailureMessage.page "?? null grade ??") (pearl . scaledGrade . fst) (DT.uncons grade))
 
 
-pearl :: Int8 -> Y.Key LearnDatum -> Foundation.Handler YC.Html
+pearl :: Int8 -> Bundle -> Foundation.Handler YC.Html
 -- In the extremely unlikely event of the learning datum being unfound, fail.
 -- This would imply a race-condition with it being deleted between review and scoring.
-pearl numGrade datumId = YC.getYesod >>= \site -> YC.liftIO (getCurrentTime >>= \time -> runSqlPool (newHistory time) (JRState.tablesFile site)) >>= maybe goHome FailureMessage.page where
+pearl numGrade (Bundle datumId) = YC.getYesod >>= \site -> YC.liftIO (getCurrentTime >>= \time -> runSqlPool (newHistory time) (JRState.tablesFile site)) >>= maybe goHome FailureMessage.page where
 	newHistory time = LearningData.get datumId >>= maybe
 			(return $ Just "?? learn ??")
 			(\learnD -> nextReviewDate datumId numGrade time learnD >>= uncurry (LearningData.updateLearnDatum datumId)

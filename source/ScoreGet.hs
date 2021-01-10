@@ -27,7 +27,7 @@ import Database.Persist.Sql (runSqlPool, fromSqlKey, Key, ToBackendKey, SqlBacke
 import Control.Monad.Trans.Reader (ReaderT)
 import GoHome (goHome)
 import qualified PresentHTML as PH
-import qualified SessionItemData (get)
+import qualified SessionItemData (get, Bundle(..))
 import ConnectionSpec (DataDescriptor(..))
 import CardExpand (expand)
 import ExternalSQL (get)
@@ -42,12 +42,12 @@ getScoreR :: Foundation.Handler YC.Html
 getScoreR = YA.requireAuthId >> SessionItemData.get >>= maybe goHome showAnswer
 
 
-showAnswer :: Key LearnDatum -> Foundation.Handler YC.Html
-showAnswer itemId = YC.getYesod >>= showAnswer' itemId
+showAnswer :: SessionItemData.Bundle -> Foundation.Handler YC.Html
+showAnswer = (YC.getYesod >>=) . showAnswer'
 
 
-showAnswer' :: Key LearnDatum -> JRState.JRState -> Foundation.Handler YC.Html
-showAnswer' itemId site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) >>= CardItemGet.rememberItem where
+showAnswer' :: SessionItemData.Bundle -> JRState.JRState -> Foundation.Handler YC.Html
+showAnswer' (SessionItemData.Bundle itemId) site = JRState.runFilteredLoggingT site (runSqlPool fn2 (JRState.tablesFile site)) >>= CardItemGet.rememberItem where
 
 	fn2 = LearningData.get itemId >>= maybe (noSomething "item" itemId) getItemAndViewIds
 

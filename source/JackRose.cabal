@@ -61,6 +61,7 @@ executable JackRose
                       PersistOpenGeneral
                       PresentHTML
                       ReviewGet
+                      ReviewShow
                       ReviewPost
                       RouteData
                       ScoreGet

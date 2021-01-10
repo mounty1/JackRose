@@ -11,7 +11,7 @@ with what is set, and is returned as the intended type.
 -}
 
 
-module SessionItemData (set, get) where
+module SessionItemData (set, get, Bundle(..)) where
 
 
 import Yesod.Core (MonadHandler)
@@ -27,21 +27,21 @@ import GHC.Int (Int64)
 itemKey :: DT.Text
 itemKey = DT.pack "JR.item"
 
+-- | 'Bundle' -- the data preserved in the client-side session.
+newtype Bundle = Bundle (Key LearnDatum)
 
-type DatumType = Key LearnDatum
 
-
+set :: MonadHandler m => Key LearnDatum -> m ()
 -- | Put the item data into the session
-set :: MonadHandler m => DatumType -> m ()
 set = setSession itemKey . showt . fromSqlKey
 
 
+get :: MonadHandler m => m (Maybe Bundle)
 -- | Get the item data.
 -- The data are then removed from the session; they can only be gotten once.
 -- If they will be needed later, they must be re-set.
-get :: MonadHandler m => m (Maybe DatumType)
 get = fmap (fmap toKey . (maybeIntValue =<<)) (lookupSession itemKey) >>= (>>) (deleteSession itemKey) . return
 
 
-toKey :: Int64 -> DatumType
-toKey = toSqlKey
+toKey :: Int64 -> Bundle
+toKey = Bundle . toSqlKey
