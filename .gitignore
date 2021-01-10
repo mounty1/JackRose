@@ -11,4 +11,5 @@ test/jackrose.sqlite-shm
 /.stack-work
 /.idea
 /JackRose.iml
+/JackRose.cabal
 /stack.yaml.lock

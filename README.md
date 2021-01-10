@@ -20,3 +20,20 @@ Now that the project has become feasibly useable:
 - I will _try_ to ensure that any database migration is automatic.
 - As soon as CI is complete, I'll only push to github when the tests pass.
 - I'll keep Haddock up to date.
+
+# CODING AND LAYOUT STANDARDS
+
+- No anonymous name importation;  either import qualified or import an explicit list.
+- No 'do'.
+- No [partial functions](https://wiki.haskell.org/Avoiding_partial_functions):  mainly replace 'head' with 'uncons'.
+- Single tab indentation.
+- Clean pass of [hlint](https://github.com/ndmitchell/hlint).
+- Clean pass of [weeder](https://github.com/ndmitchell/weeder).
+- Prefer CPS to pattern-matching.
+- Filenames ending in -Data.hs are persistent TH tables and minimal supporting code.
+- Do not use extra spaces to align related items vertically.
+
+# HADDOCK
+
+## Gentoo
+> stack exec -- haddock --html --optghc=-fno-warn-tabs source/*.hs --hyperlinked-source --odir=site/documentation/

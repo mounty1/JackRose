@@ -14,6 +14,7 @@ import Database.HDBC (execute, sFetchAllRows, prepare, toSql)
 import Database.HDBC.PostgreSQL (Connection)
 
 
+-- | execute a SQL statement and do something to the result.
 exeStmt :: ([[Maybe String]] -> a) -- ^ Conversion function.
 	-- We /always/ do /something/ with the result, so we might as well put the conversion here.
 	-- It generally makes the calling site much tidier.

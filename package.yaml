@@ -1,0 +1,78 @@
+name:                JackRose
+version:             0.8
+github:              "mounty1/JackRose"
+license:             BSD3
+author:              "Michael Mounteney"
+maintainer:          "jackrose@landcroft.com"
+copyright:           "2021 Michael Mounteney"
+synopsis:            Spaced repetition web server
+category:            Web
+description:         Please see the README on GitHub at <https://github.com/mounty1/JackRose#readme>
+
+extra-source-files:
+- README.md
+- LICENCE.md
+
+ghc-options:
+- -Wall
+- -O2
+- -fno-warn-tabs
+dependencies:
+- base
+- yesod
+- text
+- bytestring
+- persistent
+- persistent-sqlite
+- monad-logger
+- monad-control
+- persistent-postgresql
+- yesod-core
+- yesod-auth
+- HDBC
+- HDBC-postgresql
+- xml-conduit
+- containers
+- transformers
+- yesod-auth-account
+- time
+- text-show
+- stm
+- wai
+- mime-mail
+- ConfigFile
+- mtl
+- blaze-html
+
+library:
+  source-dirs: source
+
+executables:
+  JackRose:
+    main:        JackRose.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    dependencies:
+    - persistent-template
+    - JackRose
+
+  AnkiConvert:
+    main:        AnkiConvert.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    dependencies:
+    - containers
+    - JackRose
+
+#tests:
+#  wot-test:
+#    main:                Spec.hs
+#    source-dirs:         test
+#    ghc-options:
+#    - -threaded
+#    - -rtsopts
+#    - -with-rtsopts=-N
+#    dependencies:
+#    - wot

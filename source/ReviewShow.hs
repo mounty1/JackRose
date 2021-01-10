@@ -42,6 +42,8 @@ import qualified CardItemGet (PresentationParams, rememberItem)
 
 
 showAtRoot :: JRState.JRState -> [DT.Text] -> (UserId, [UserDeck.UserDeckCpt]) -> Foundation.Handler YC.Html
+-- | Present the next item for review.
+-- Called /after/ authentication, since it does not perform such itself.
 showAtRoot site deckPath userNodes = descendToDeckRoot site Nothing deckPath [] userNodes
 
 

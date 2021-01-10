@@ -27,7 +27,7 @@ If you want to run Postgres locally, install `pkgs.postgresql` as well.
 
 ## On Gentoo
 
-    # emerge ghc cabal
+    stack build
 
 ## Ubuntu, Mess Windoze etc.
 

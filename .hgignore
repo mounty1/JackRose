@@ -9,6 +9,7 @@ test/jackrose.sqlite
 test/jackrose.sqlite-wal
 test/jackrose.sqlite-shm
 .stack-work/
-.idea
+.idea/
 JackRose.iml
+JackRose.cabal
 stack.yaml.lock
